@@ -1,0 +1,1289 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>빛 시뮬레이션 - 중학교 2학년 과학</title>
+<style>
+:root {
+  --bg: #0a0e1a;
+  --panel: #111827;
+  --panel2: #1a2235;
+  --border: #2a3548;
+  --accent: #3b82f6;
+  --accent2: #06b6d4;
+  --text: #e2e8f0;
+  --muted: #64748b;
+  --highlight: #1e3a5f;
+  --red: #ef4444;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Pretendard', 'Noto Sans KR', sans-serif;
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  font-size: 13px;
+}
+#sidebar {
+  width: 290px;
+  min-width: 290px;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+#sidebar::-webkit-scrollbar { width: 4px; }
+#sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.sidebar-header {
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel2);
+}
+.sidebar-header h1 { font-size: 15px; font-weight: 700; color: var(--accent2); }
+.sidebar-header p { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.section { border-bottom: 1px solid var(--border); padding: 12px 16px; }
+.section-title {
+  font-size: 11px; font-weight: 600; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px;
+}
+.btn {
+  background: var(--panel2); border: 1px solid var(--border);
+  color: var(--text); padding: 6px 10px; border-radius: 6px;
+  cursor: pointer; font-size: 12px; transition: all 0.15s;
+}
+.btn:hover { background: var(--highlight); border-color: var(--accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary:hover { background: #2563eb; }
+.btn.danger { background: transparent; border-color: var(--red); color: var(--red); }
+.btn.danger:hover { background: rgba(239,68,68,0.1); }
+.btn.small { padding: 3px 8px; font-size: 10px; }
+.btn-row { display: flex; gap: 6px; flex-wrap: wrap; }
+select {
+  background: var(--panel2); border: 1px solid var(--border);
+  color: var(--text); padding: 6px 8px; border-radius: 6px;
+  font-size: 12px; width: 100%; cursor: pointer; margin-bottom: 8px;
+}
+.slider-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.slider-row label { font-size: 11px; color: var(--muted); min-width: 56px; }
+.slider-row input[type=range] { flex: 1; accent-color: var(--accent); height: 3px; }
+.slider-row span { font-size: 11px; color: var(--text); min-width: 38px; text-align: right; font-variant-numeric: tabular-nums; }
+.toggle-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.toggle-label { font-size: 12px; }
+.toggle {
+  width: 36px; height: 20px; background: var(--border);
+  border-radius: 10px; position: relative; cursor: pointer;
+  transition: background 0.2s; border: none; flex-shrink: 0;
+}
+.toggle.on { background: var(--accent); }
+.toggle::after {
+  content: ''; width: 14px; height: 14px; background: #fff;
+  border-radius: 50%; position: absolute; top: 3px; left: 3px;
+  transition: left 0.2s;
+}
+.toggle.on::after { left: 19px; }
+.element-list { display: flex; flex-direction: column; gap: 4px; }
+.element-item {
+  background: var(--panel2); border: 1px solid var(--border);
+  border-radius: 6px; padding: 8px 10px; cursor: pointer;
+}
+.element-item:hover { border-color: var(--accent); }
+.element-item.selected { border-color: var(--accent); background: var(--highlight); }
+.element-item .el-name { font-size: 12px; font-weight: 500; }
+.element-item .el-type { font-size: 10px; color: var(--muted); }
+.el-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-right: 8px; display: inline-block; vertical-align: middle; }
+.info-panel {
+  background: var(--panel2); border: 1px solid var(--border);
+  border-radius: 6px; padding: 10px; margin-bottom: 8px;
+  font-size: 11px; line-height: 1.7; color: var(--muted);
+}
+.info-panel strong { color: var(--text); }
+.laser-card {
+  background: var(--panel2); border: 1px solid var(--border);
+  border-radius: 6px; padding: 8px 10px; margin-bottom: 6px;
+}
+.laser-card-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 6px;
+}
+.laser-card-header span { font-size: 11px; color: var(--muted); }
+.canvas-area { flex: 1; position: relative; overflow: hidden; }
+#mainCanvas { width: 100%; height: 100%; display: block; cursor: crosshair; }
+.legend {
+  position: absolute; bottom: 12px; left: 12px;
+  background: rgba(17,24,39,0.9); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 12px; font-size: 10px;
+  backdrop-filter: blur(10px);
+}
+.legend-item { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; color: var(--muted); }
+.legend-line { width: 20px; height: 2px; border-radius: 1px; }
+.color-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.help {
+  position: absolute; top: 12px; right: 12px;
+  background: rgba(17,24,39,0.9); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 14px; font-size: 11px;
+  backdrop-filter: blur(10px); color: var(--muted); max-width: 260px;
+  line-height: 1.7;
+}
+.help strong { color: var(--accent2); display: block; margin-bottom: 4px; }
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+  <div class="sidebar-header">
+    <h1>🔬 빛 시뮬레이션</h1>
+    <p>중학교 2학년 과학 | 반사와 굴절</p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">🎯 광학 요소 추가</div>
+    <select id="elementType">
+      <option value="flat_mirror">평면 거울</option>
+      <option value="concave_mirror">오목 거울</option>
+      <option value="convex_mirror">볼록 거울</option>
+      <option value="convex_lens">볼록 렌즈</option>
+      <option value="concave_lens">오목 렌즈</option>
+    </select>
+    <div class="btn-row">
+      <button class="btn primary" onclick="addElement()">+ 추가</button>
+      <button class="btn danger" onclick="removeSelected()">선택 삭제</button>
+      <button class="btn" onclick="clearAll()">초기화</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">⚙️ 선택 요소 속성</div>
+    <div id="elementProps">
+      <div class="info-panel">요소 클릭 → 선택<br><strong style="color:#fb923c">주황 핸들</strong>을 드래그하면 회전</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">🔦 레이저 광선</div>
+    <div class="btn-row" style="margin-bottom:10px">
+      <button class="btn primary small" onclick="addLaser()">+ 레이저 추가</button>
+      <button class="btn small" onclick="clearLasers()">전체 삭제</button>
+    </div>
+    <div id="laserControls"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">💡 광원 설정</div>
+    <div class="toggle-row">
+      <span class="toggle-label">광원 활성화</span>
+      <button class="toggle" id="lightSourceToggle" onclick="toggleLightSource()"></button>
+    </div>
+    <div class="slider-row">
+      <label>광선 수</label>
+      <input type="range" min="4" max="64" value="16" step="4" id="rayCount" oninput="updateLightSource()">
+      <span id="rayCountVal">16</span>
+    </div>
+    <div class="slider-row">
+      <label>방출 각도</label>
+      <input type="range" min="10" max="360" value="360" step="10" id="emitAngle" oninput="updateLightSource()">
+      <span id="emitAngleVal">360°</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">🌀 표시 설정</div>
+    <div class="toggle-row">
+      <span class="toggle-label">난반사 모드</span>
+      <button class="toggle" id="diffuseToggle" onclick="toggleDiffuse()"></button>
+    </div>
+    <div class="toggle-row">
+      <span class="toggle-label">법선 표시</span>
+      <button class="toggle" id="normalToggle" onclick="toggleNormal()"></button>
+    </div>
+    <div class="toggle-row">
+      <span class="toggle-label">초점 표시</span>
+      <button class="toggle on" id="focalToggle" onclick="toggleFocal()"></button>
+    </div>
+    <div class="toggle-row">
+      <span class="toggle-label">격자 표시</span>
+      <button class="toggle" id="gridToggle" onclick="toggleGrid()"></button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">📋 광학 요소 목록</div>
+    <div class="element-list" id="elementList"></div>
+  </div>
+</div>
+
+<div class="canvas-area">
+  <canvas id="mainCanvas"></canvas>
+  <div class="help">
+    <strong>조작 방법</strong>
+    • 광학 요소 클릭 → 선택<br>
+    • 요소 본체 드래그 → 이동<br>
+    • <span style="color:#fb923c">주황 핸들</span> 드래그 → 회전<br>
+    • <span style="color:#fbbf24">레이저 원점</span> 드래그 → 위치<br>
+    • <span style="color:#fbbf24">레이저 화살표</span> 드래그 → 각도<br>
+    • <span style="color:#a78bfa">광원</span> 드래그 → 광원 이동
+  </div>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-line" style="background:#fbbf24"></div>레이저</div>
+    <div class="legend-item"><div class="legend-line" style="background:#f97316"></div>광원 광선</div>
+    <div class="legend-item"><div class="legend-line" style="background:rgba(200,200,200,0.5)"></div>난반사 산란</div>
+    <div class="legend-item"><div class="color-dot" style="background:#ef4444"></div>초점(F)</div>
+    <div class="legend-item"><div class="color-dot" style="background:#a78bfa"></div>광원</div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('mainCanvas');
+const ctx = canvas.getContext('2d');
+
+let W, H;
+let elements = [];
+let lasers = [];
+let lightSource = { x: 200, y: 300, active: false, rayCount: 16, emitAngle: 360 };
+let selectedEl = null;
+let nextId = 1;
+let nextLaserId = 1;
+
+let dragMode = null;
+let dragTarget = null;
+let dragOffset = { x: 0, y: 0 };
+
+let showDiffuse = false;
+let showNormal = false;
+let showFocal = true;
+let showGrid = false;
+
+const COLORS = {
+  flat_mirror: '#60a5fa',
+  concave_mirror: '#34d399',
+  convex_mirror: '#a78bfa',
+  convex_lens: '#fb923c',
+  concave_lens: '#f472b6'
+};
+const NAMES = {
+  flat_mirror: '평면 거울',
+  concave_mirror: '오목 거울',
+  convex_mirror: '볼록 거울',
+  convex_lens: '볼록 렌즈',
+  concave_lens: '오목 렌즈'
+};
+const LASER_COLORS = ['#fbbf24','#f87171','#34d399','#60a5fa','#a78bfa','#fb923c','#f472b6','#2dd4bf','#facc15','#fda4af','#86efac','#93c5fd'];
+
+function resize() {
+  const area = canvas.parentElement;
+  W = canvas.width = area.clientWidth;
+  H = canvas.height = area.clientHeight;
+  render();
+}
+
+// ─── Vector helpers ─────────────────────────────────────────────────────────
+
+function vec(x, y) { return { x, y }; }
+function add(a, b) { return vec(a.x + b.x, a.y + b.y); }
+function sub(a, b) { return vec(a.x - b.x, a.y - b.y); }
+function scale(v, s) { return vec(v.x * s, v.y * s); }
+function dot(a, b) { return a.x * b.x + a.y * b.y; }
+function len(v) { return Math.sqrt(v.x * v.x + v.y * v.y); }
+function norm(v) { const l = len(v); return l < 1e-10 ? vec(0, 0) : vec(v.x / l, v.y / l); }
+function reflect(d, n) { return sub(d, scale(n, 2 * dot(d, n))); }
+
+// Element local frame:
+//   along = unit vector along chord (rotates with angle)
+//   perp  = unit vector 90° CCW from along; this is the "front" / reflective side
+//   For mirror with angle=0: along=(1,0), perp=(0,-1). So front faces UP.
+//   Concave: center of curvature is on +perp side.
+//   Convex:  center of curvature is on -perp side.
+//   Reflective surface always on +perp side.
+function elementBasis(el) {
+  const c = Math.cos(el.angle), s = Math.sin(el.angle);
+  return {
+    along: vec(c, s),
+    perp: vec(s, -c)  // 90° CCW from along (in screen coords where y is down)
+  };
+}
+
+// ─── Element management ────────────────────────────────────────────────────
+
+function addElement() {
+  const type = document.getElementById('elementType').value;
+  const el = {
+    id: nextId++, type,
+    x: W / 2 + (Math.random() - 0.5) * 150,
+    y: H / 2 + (Math.random() - 0.5) * 100,
+    size: 140,
+    radius: 280,
+    angle: 0,
+    diffuse: false
+  };
+  elements.push(el);
+  selectElement(el);
+  renderList();
+  render();
+}
+
+function removeSelected() {
+  if (!selectedEl) return;
+  elements = elements.filter(e => e.id !== selectedEl.id);
+  selectedEl = null;
+  renderList();
+  renderProps();
+  render();
+}
+
+function clearAll() {
+  elements = [];
+  selectedEl = null;
+  renderList();
+  renderProps();
+  render();
+}
+
+function selectElement(el) {
+  selectedEl = el;
+  renderList();
+  renderProps();
+  render();
+}
+
+function renderList() {
+  const div = document.getElementById('elementList');
+  if (elements.length === 0) {
+    div.innerHTML = '<div class="info-panel" style="text-align:center">추가된 요소 없음</div>';
+    return;
+  }
+  div.innerHTML = elements.map(e => `
+    <div class="element-item ${selectedEl && selectedEl.id === e.id ? 'selected' : ''}" onclick="selectElement(elements.find(x=>x.id===${e.id}))">
+      <span class="el-dot" style="background:${COLORS[e.type]}"></span>
+      <span class="el-name">${NAMES[e.type]}</span>
+      <span class="el-type" style="float:right">크기 ${Math.round(e.size)}${e.type==='flat_mirror'?'':' · R '+Math.round(e.radius)}</span>
+    </div>
+  `).join('');
+}
+
+function renderProps() {
+  const div = document.getElementById('elementProps');
+  if (!selectedEl) {
+    div.innerHTML = '<div class="info-panel">요소 클릭 → 선택<br><strong style="color:#fb923c">주황 핸들</strong>을 드래그하면 회전</div>';
+    return;
+  }
+  const el = selectedEl;
+  const needsR = el.type !== 'flat_mirror';
+  div.innerHTML = `
+    <div class="slider-row">
+      <label>크기</label>
+      <input type="range" min="40" max="320" value="${el.size}" oninput="updateProp('size',this.value)">
+      <span id="propSizeVal">${Math.round(el.size)}</span>
+    </div>
+    <div class="slider-row">
+      <label>회전</label>
+      <input type="range" min="-180" max="180" value="${Math.round(el.angle*180/Math.PI)}" oninput="updateProp('angle',this.value,true)">
+      <span id="propAngleVal">${Math.round(el.angle*180/Math.PI)}°</span>
+    </div>
+    ${needsR ? `
+    <div class="slider-row">
+      <label>곡률반경 R</label>
+      <input type="range" min="80" max="800" value="${el.radius}" oninput="updateProp('radius',this.value)">
+      <span id="propRadiusVal">${Math.round(el.radius)}</span>
+    </div>
+    <div class="info-panel" id="focalInfo" style="margin-top:6px">초점거리 f = R/2 = ${Math.round(el.radius/2)}</div>
+    ` : ''}
+    <div class="toggle-row">
+      <span class="toggle-label">난반사 표면</span>
+      <button class="toggle ${el.diffuse ? 'on' : ''}" id="elDiffuse" onclick="toggleElDiffuse()"></button>
+    </div>
+  `;
+}
+
+function updateProp(key, val, isDeg) {
+  if (!selectedEl) return;
+  const v = isDeg ? parseFloat(val) * Math.PI / 180 : parseFloat(val);
+  selectedEl[key] = v;
+  const span = document.getElementById(`prop${key.charAt(0).toUpperCase()+key.slice(1)}Val`);
+  if (span) span.textContent = isDeg ? `${Math.round(parseFloat(val))}°` : Math.round(v);
+  if (key === 'radius') {
+    const fInfo = document.getElementById('focalInfo');
+    if (fInfo) fInfo.innerHTML = `초점거리 f = R/2 = ${Math.round(v/2)}`;
+  }
+  renderList();
+  render();
+}
+
+function toggleElDiffuse() {
+  if (!selectedEl) return;
+  selectedEl.diffuse = !selectedEl.diffuse;
+  document.getElementById('elDiffuse').classList.toggle('on');
+  render();
+}
+
+// ─── Lasers ────────────────────────────────────────────────────────────────
+
+function addLaser() {
+  if (lasers.length >= 12) return;
+  const idx = lasers.length;
+  lasers.push({
+    id: nextLaserId++,
+    x: 60,
+    y: 80 + idx * 50,
+    angle: 0,
+    color: LASER_COLORS[idx % LASER_COLORS.length]
+  });
+  renderLaserControls();
+  render();
+}
+
+function clearLasers() {
+  lasers = [];
+  renderLaserControls();
+  render();
+}
+
+function removeLaser(id) {
+  lasers = lasers.filter(l => l.id !== id);
+  renderLaserControls();
+  render();
+}
+
+function renderLaserControls() {
+  const div = document.getElementById('laserControls');
+  if (lasers.length === 0) {
+    div.innerHTML = '<div class="info-panel" style="text-align:center">레이저 없음</div>';
+    return;
+  }
+  div.innerHTML = lasers.map((l, i) => `
+    <div class="laser-card" style="border-left:3px solid ${l.color}">
+      <div class="laser-card-header">
+        <span>레이저 ${i+1}</span>
+        <button class="btn small danger" onclick="removeLaser(${l.id})">삭제</button>
+      </div>
+      <div class="slider-row">
+        <label>각도</label>
+        <input type="range" min="-180" max="180" value="${Math.round(l.angle)}" oninput="updateLaserAngle(${l.id},this.value)">
+        <span id="laserA${l.id}">${Math.round(l.angle)}°</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function updateLaserAngle(id, val) {
+  const l = lasers.find(x => x.id === id);
+  if (!l) return;
+  l.angle = parseFloat(val);
+  document.getElementById('laserA'+id).textContent = `${Math.round(val)}°`;
+  render();
+}
+
+// ─── Light source ──────────────────────────────────────────────────────────
+
+function toggleLightSource() {
+  lightSource.active = !lightSource.active;
+  document.getElementById('lightSourceToggle').classList.toggle('on');
+  render();
+}
+
+function updateLightSource() {
+  lightSource.rayCount = parseInt(document.getElementById('rayCount').value);
+  lightSource.emitAngle = parseInt(document.getElementById('emitAngle').value);
+  document.getElementById('rayCountVal').textContent = lightSource.rayCount;
+  document.getElementById('emitAngleVal').textContent = lightSource.emitAngle + '°';
+  render();
+}
+
+function toggleDiffuse() { showDiffuse = !showDiffuse; document.getElementById('diffuseToggle').classList.toggle('on'); render(); }
+function toggleNormal() { showNormal = !showNormal; document.getElementById('normalToggle').classList.toggle('on'); render(); }
+function toggleFocal() { showFocal = !showFocal; document.getElementById('focalToggle').classList.toggle('on'); render(); }
+function toggleGrid() { showGrid = !showGrid; document.getElementById('gridToggle').classList.toggle('on'); render(); }
+
+// ─── Geometry ──────────────────────────────────────────────────────────────
+
+// For curved mirror: center of curvature
+// Concave: center is at +perp (front side)
+// Convex:  center is at -perp (back side)
+// Reflective surface is on the +perp side in both cases.
+function arcGeometry(el) {
+  const { perp } = elementBasis(el);
+  let center;
+  if (el.type === 'concave_mirror') {
+    center = add(vec(el.x, el.y), scale(perp, el.radius));
+  } else {
+    center = sub(vec(el.x, el.y), scale(perp, el.radius));
+  }
+  const halfAng = Math.asin(Math.min(0.999, (el.size / 2) / el.radius));
+  return { center, R: el.radius, halfAng };
+}
+
+function getElementEndpoints(el) {
+  const { along } = elementBasis(el);
+  const half = el.size / 2;
+  return {
+    p1: vec(el.x - along.x * half, el.y - along.y * half),
+    p2: vec(el.x + along.x * half, el.y + along.y * half)
+  };
+}
+
+function lineSegIntersect(origin, dir, p1, p2) {
+  const d2 = sub(p2, p1);
+  const cross = dir.x * d2.y - dir.y * d2.x;
+  if (Math.abs(cross) < 1e-9) return null;
+  const t = ((p1.x - origin.x) * d2.y - (p1.y - origin.y) * d2.x) / cross;
+  const u = ((p1.x - origin.x) * dir.y - (p1.y - origin.y) * dir.x) / cross;
+  if (t < 1e-3 || u < -0.005 || u > 1.005) return null;
+  return { t, pt: add(origin, scale(dir, t)) };
+}
+
+function rayCircleIntersect(origin, dir, center, R) {
+  const oc = sub(origin, center);
+  const a = dot(dir, dir);
+  const b = 2 * dot(oc, dir);
+  const c = dot(oc, oc) - R * R;
+  const disc = b * b - 4 * a * c;
+  if (disc < 0) return [];
+  const sq = Math.sqrt(disc);
+  return [(-b - sq) / (2 * a), (-b + sq) / (2 * a)].filter(t => t > 1e-3);
+}
+
+// Check if a hit point on the circle lies within the arc's angular extent
+function pointOnArc(el, pt) {
+  const { center, halfAng } = arcGeometry(el);
+  const { perp, along } = elementBasis(el);
+  // Direction from center to pt (this is the surface normal direction outward from center)
+  const v = norm(sub(pt, center));
+  // For concave mirror: surface is on -perp side relative to center (so v should have negative perp component)
+  // For convex mirror:  surface is on +perp side relative to center
+  let baseDir;
+  if (el.type === 'concave_mirror') {
+    baseDir = scale(perp, -1);
+  } else {
+    baseDir = perp;
+  }
+  // Component along baseDir (should be positive)
+  const radial = dot(v, baseDir);
+  if (radial < 0) return false;
+  // Component along chord direction
+  const tangential = dot(v, along);
+  const ang = Math.atan2(tangential, radial);
+  return Math.abs(ang) <= halfAng + 1e-3;
+}
+
+function intersectElement(el, origin, dir) {
+  if (el.type === 'flat_mirror') {
+    const { p1, p2 } = getElementEndpoints(el);
+    return lineSegIntersect(origin, dir, p1, p2) ? { ...lineSegIntersect(origin, dir, p1, p2), el } : null;
+  }
+  if (el.type === 'concave_mirror' || el.type === 'convex_mirror') {
+    const { center, R } = arcGeometry(el);
+    const ts = rayCircleIntersect(origin, dir, center, R);
+    let best = null;
+    for (const t of ts) {
+      const pt = add(origin, scale(dir, t));
+      if (pointOnArc(el, pt)) {
+        if (!best || t < best.t) best = { t, pt, el };
+      }
+    }
+    return best;
+  }
+  if (el.type === 'convex_lens' || el.type === 'concave_lens') {
+    const { p1, p2 } = getElementEndpoints(el);
+    const hit = lineSegIntersect(origin, dir, p1, p2);
+    return hit ? { ...hit, el } : null;
+  }
+  return null;
+}
+
+// Mirror normal at hit point. Always points back toward incoming ray.
+function getMirrorNormal(el, pt, incomingDir) {
+  let n;
+  if (el.type === 'flat_mirror') {
+    n = elementBasis(el).perp;
+  } else {
+    const { center } = arcGeometry(el);
+    if (el.type === 'concave_mirror') {
+      // For concave: center is at +perp side, surface on the inside of circle
+      // Normal points from surface TOWARD center
+      n = norm(sub(center, pt));
+    } else {
+      // For convex: center is at -perp side, surface on the outside of circle
+      // Normal points FROM center toward surface (outward)
+      n = norm(sub(pt, center));
+    }
+  }
+  // Flip if necessary so normal opposes incoming direction
+  if (dot(n, incomingDir) > 0) n = scale(n, -1);
+  return n;
+}
+
+// Thin lens refraction using thin-lens approximation in local frame
+function refractLens(el, pt, dirIn) {
+  const { along, perp } = elementBasis(el);
+  const f = el.type === 'convex_lens' ? el.radius / 2 : -el.radius / 2;
+
+  // Optical axis = perp direction. Make it point in same general direction as ray.
+  let axis = perp;
+  if (dot(dirIn, axis) < 0) axis = scale(axis, -1);
+  // Height direction = along
+  const height = along;
+
+  // Signed height of intersection from element center
+  const center = vec(el.x, el.y);
+  const h = dot(sub(pt, center), height);
+
+  // Decompose incoming direction
+  const dAxis = dot(dirIn, axis);
+  const dHeight = dot(dirIn, height);
+  if (Math.abs(dAxis) < 1e-6) return dirIn;
+  const tanIn = dHeight / dAxis;
+
+  // Thin-lens formula: tan(out) = tan(in) - h/f
+  const tanOut = tanIn - h / f;
+
+  // Reconstruct direction (axis component = 1, then normalize)
+  return norm(add(axis, scale(height, tanOut)));
+}
+
+// ─── Ray tracing ───────────────────────────────────────────────────────────
+
+function traceRay(ox, oy, dx, dy, maxBounces = 12) {
+  const segments = [];
+  const bounces = [];
+  let origin = vec(ox, oy);
+  let dir = norm(vec(dx, dy));
+
+  for (let i = 0; i <= maxBounces; i++) {
+    let closest = null;
+    for (const el of elements) {
+      const hit = intersectElement(el, origin, dir);
+      if (hit && (!closest || hit.t < closest.t)) closest = hit;
+    }
+
+    const boundary = traceBoundary(origin, dir);
+
+    if (!closest || boundary.t < closest.t) {
+      segments.push({ x1: origin.x, y1: origin.y, x2: boundary.pt.x, y2: boundary.pt.y });
+      break;
+    }
+
+    segments.push({ x1: origin.x, y1: origin.y, x2: closest.pt.x, y2: closest.pt.y });
+
+    const el = closest.el;
+
+    if (el.diffuse) {
+      bounces.push({ pt: closest.pt, el, type: 'diffuse', normal: getMirrorNormal(el, closest.pt, dir) });
+      break;
+    }
+
+    let newDir, normal;
+    if (el.type.includes('mirror')) {
+      normal = getMirrorNormal(el, closest.pt, dir);
+      newDir = reflect(dir, normal);
+      bounces.push({ pt: closest.pt, el, type: 'reflect', normal });
+    } else {
+      normal = elementBasis(el).perp;
+      if (dot(normal, dir) > 0) normal = scale(normal, -1);
+      newDir = refractLens(el, closest.pt, dir);
+      bounces.push({ pt: closest.pt, el, type: 'refract', normal });
+    }
+
+    // Step slightly off the surface to avoid re-intersection
+    origin = add(closest.pt, scale(newDir, 0.5));
+    dir = newDir;
+  }
+
+  return { segments, bounces };
+}
+
+function traceBoundary(origin, dir) {
+  let tMin = Infinity;
+  if (Math.abs(dir.x) > 1e-9) {
+    const t1 = -origin.x / dir.x;
+    const t2 = (W - origin.x) / dir.x;
+    if (t1 > 0.05) tMin = Math.min(tMin, t1);
+    if (t2 > 0.05) tMin = Math.min(tMin, t2);
+  }
+  if (Math.abs(dir.y) > 1e-9) {
+    const t1 = -origin.y / dir.y;
+    const t2 = (H - origin.y) / dir.y;
+    if (t1 > 0.05) tMin = Math.min(tMin, t1);
+    if (t2 > 0.05) tMin = Math.min(tMin, t2);
+  }
+  if (tMin === Infinity) tMin = 2000;
+  return { t: tMin, pt: add(origin, scale(dir, tMin)) };
+}
+
+function diffuseScatter(pt, normal, count = 12) {
+  const tangent = vec(-normal.y, normal.x);
+  const rays = [];
+  for (let i = 0; i < count; i++) {
+    const a = (Math.random() - 0.5) * Math.PI * 0.95;
+    rays.push(norm(add(scale(normal, Math.cos(a)), scale(tangent, Math.sin(a)))));
+  }
+  return rays;
+}
+
+// ─── Render ────────────────────────────────────────────────────────────────
+
+function render() {
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#0a0e1a';
+  ctx.fillRect(0, 0, W, H);
+
+  if (showGrid) drawGrid();
+
+  // Trace lasers
+  lasers.forEach(laser => {
+    const rad = laser.angle * Math.PI / 180;
+    const result = traceRay(laser.x, laser.y, Math.cos(rad), Math.sin(rad));
+    drawRay(result, laser.color);
+  });
+
+  // Trace light source
+  if (lightSource.active) {
+    const halfA = (lightSource.emitAngle / 2) * Math.PI / 180;
+    const n = lightSource.rayCount;
+    for (let i = 0; i < n; i++) {
+      const t = n === 1 ? 0 : (i / (n - 1)) * 2 - 1;
+      const angle = t * halfA;
+      const result = traceRay(lightSource.x, lightSource.y, Math.cos(angle), Math.sin(angle), 6);
+      drawRay(result, '#f97316', 0.65);
+    }
+  }
+
+  // Elements
+  elements.forEach(el => drawElement(el));
+
+  if (showFocal) elements.forEach(el => drawFocalPoints(el));
+
+  // Light source icon
+  if (lightSource.active) drawLightSourceIcon();
+
+  // Lasers
+  lasers.forEach((l, i) => drawLaser(l, i));
+
+  // Rotation handle
+  if (selectedEl) drawRotationHandle(selectedEl);
+}
+
+function drawGrid() {
+  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < W; x += 40) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+  }
+  for (let y = 0; y < H; y += 40) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+}
+
+function drawRay(result, color, alpha = 0.9) {
+  const { segments, bounces } = result;
+
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.globalAlpha = alpha;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 6;
+  segments.forEach(seg => {
+    ctx.beginPath();
+    ctx.moveTo(seg.x1, seg.y1);
+    ctx.lineTo(seg.x2, seg.y2);
+    ctx.stroke();
+  });
+  ctx.restore();
+
+  if (showNormal) {
+    ctx.save();
+    ctx.strokeStyle = '#60a5fa';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.globalAlpha = 0.6;
+    bounces.forEach(b => {
+      ctx.beginPath();
+      ctx.moveTo(b.pt.x - b.normal.x * 30, b.pt.y - b.normal.y * 30);
+      ctx.lineTo(b.pt.x + b.normal.x * 30, b.pt.y + b.normal.y * 30);
+      ctx.stroke();
+    });
+    ctx.restore();
+  }
+
+  if (showDiffuse) {
+    bounces.forEach(b => {
+      if (b.type === 'diffuse' || (b.el && b.el.diffuse)) {
+        const rays = diffuseScatter(b.pt, b.normal, 12);
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.globalAlpha = 0.28;
+        ctx.lineWidth = 1;
+        rays.forEach(r => {
+          const end = add(b.pt, scale(r, 50 + Math.random() * 40));
+          ctx.beginPath();
+          ctx.moveTo(b.pt.x, b.pt.y);
+          ctx.lineTo(end.x, end.y);
+          ctx.stroke();
+        });
+        ctx.restore();
+      }
+    });
+  }
+}
+
+function drawElement(el) {
+  const col = COLORS[el.type];
+  const isSelected = selectedEl && selectedEl.id === el.id;
+  const { perp, along } = elementBasis(el);
+
+  ctx.save();
+  ctx.strokeStyle = isSelected ? '#fff' : col;
+  ctx.lineWidth = isSelected ? 3 : 2.5;
+  ctx.lineCap = 'round';
+  ctx.shadowColor = col;
+  ctx.shadowBlur = isSelected ? 14 : 6;
+
+  if (el.type === 'flat_mirror') {
+    const { p1, p2 } = getElementEndpoints(el);
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.stroke();
+    // Hatching on back side (-perp direction)
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(150,150,150,0.4)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 8; i++) {
+      const t = i / 8;
+      const px = p1.x + (p2.x - p1.x) * t;
+      const py = p1.y + (p2.y - p1.y) * t;
+      ctx.beginPath();
+      ctx.moveTo(px, py);
+      ctx.lineTo(px - perp.x * 8, py - perp.y * 8);
+      ctx.stroke();
+    }
+  } else if (el.type === 'concave_mirror' || el.type === 'convex_mirror') {
+    // Draw the arc by sampling points along the curve
+    const samples = 50;
+    const half = el.size / 2;
+    const { center, R } = arcGeometry(el);
+    const points = [];
+    for (let i = 0; i <= samples; i++) {
+      const t = (i / samples) * 2 - 1; // -1 to 1
+      // Position along chord
+      const chordPt = add(vec(el.x, el.y), scale(along, t * half));
+      // Project onto circle: vector from center to chord point, normalize, scale by R
+      const dirFromCenter = norm(sub(chordPt, center));
+      const surfPt = add(center, scale(dirFromCenter, R));
+      points.push(surfPt);
+    }
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+      ctx.lineTo(points[i].x, points[i].y);
+    }
+    ctx.stroke();
+
+    // Hatching on back side
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(150,150,150,0.4)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < points.length; i += 5) {
+      const sp = points[i];
+      // Back direction = away from reflective side. Reflective side is +perp.
+      // For concave mirror, the surface bulges in -perp direction, so back is in -perp.
+      // Wait: actually back hatching should be on the -perp side (the mirror's back)
+      const backDir = scale(perp, -1);
+      ctx.beginPath();
+      ctx.moveTo(sp.x, sp.y);
+      ctx.lineTo(sp.x + backDir.x * 8, sp.y + backDir.y * 8);
+      ctx.stroke();
+    }
+  } else {
+    // Lens
+    const { p1, p2 } = getElementEndpoints(el);
+    const bulge = el.type === 'convex_lens' ? el.size / 5 : -el.size / 5;
+    const mid = scale(add(p1, p2), 0.5);
+    const cp1 = add(mid, scale(perp, bulge));
+    const cp2 = sub(mid, scale(perp, bulge));
+
+    ctx.fillStyle = col + '22';
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.quadraticCurveTo(cp1.x, cp1.y, p2.x, p2.y);
+    ctx.quadraticCurveTo(cp2.x, cp2.y, p1.x, p1.y);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.quadraticCurveTo(cp1.x, cp1.y, p2.x, p2.y);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.quadraticCurveTo(cp2.x, cp2.y, p2.x, p2.y);
+    ctx.stroke();
+
+    // Optical axis
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 4]);
+    ctx.beginPath();
+    ctx.moveTo(el.x - perp.x * 1500, el.y - perp.y * 1500);
+    ctx.lineTo(el.x + perp.x * 1500, el.y + perp.y * 1500);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Label
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = col;
+  ctx.font = '11px sans-serif';
+  ctx.globalAlpha = 0.85;
+  ctx.fillText(NAMES[el.type], el.x + 14, el.y - 14);
+
+  ctx.restore();
+}
+
+function drawRotationHandle(el) {
+  const { perp } = elementBasis(el);
+  const d = el.size / 2 + 36;
+  const hx = el.x + perp.x * d;
+  const hy = el.y + perp.y * d;
+
+  ctx.save();
+  ctx.strokeStyle = 'rgba(251,146,60,0.5)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath();
+  ctx.moveTo(el.x, el.y);
+  ctx.lineTo(hx, hy);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.fillStyle = '#fb923c';
+  ctx.shadowColor = '#fb923c';
+  ctx.shadowBlur = 12;
+  ctx.beginPath();
+  ctx.arc(hx, hy, 8, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.arc(hx, hy, 4.5, -Math.PI * 0.7, Math.PI * 0.7);
+  ctx.stroke();
+  // Arrow tip
+  ctx.beginPath();
+  ctx.moveTo(hx + 4.5 * Math.cos(Math.PI * 0.7), hy + 4.5 * Math.sin(Math.PI * 0.7));
+  ctx.lineTo(hx + 4.5 * Math.cos(Math.PI * 0.7) + 2, hy + 4.5 * Math.sin(Math.PI * 0.7) - 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawFocalPoints(el) {
+  if (el.type === 'flat_mirror') return;
+  const { perp } = elementBasis(el);
+  const f = el.radius / 2;
+  let pts = [];
+
+  if (el.type === 'concave_mirror') {
+    pts = [add(vec(el.x, el.y), scale(perp, f))];
+  } else if (el.type === 'convex_mirror') {
+    pts = [sub(vec(el.x, el.y), scale(perp, f))];
+  } else {
+    pts = [
+      add(vec(el.x, el.y), scale(perp, f)),
+      sub(vec(el.x, el.y), scale(perp, f))
+    ];
+  }
+
+  pts.forEach(fp => {
+    ctx.save();
+    ctx.strokeStyle = '#ef4444';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    ctx.globalAlpha = 0.5;
+    ctx.beginPath();
+    ctx.arc(fp.x, fp.y, 6, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#ef4444';
+    ctx.globalAlpha = 0.95;
+    ctx.beginPath();
+    ctx.arc(fp.x, fp.y, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.font = 'bold 11px sans-serif';
+    ctx.fillStyle = '#ef4444';
+    ctx.globalAlpha = 0.9;
+    ctx.fillText('F', fp.x + 8, fp.y - 6);
+    ctx.restore();
+  });
+}
+
+function drawLightSourceIcon() {
+  const { x, y } = lightSource;
+  ctx.save();
+  ctx.fillStyle = '#a78bfa';
+  ctx.shadowColor = '#a78bfa';
+  ctx.shadowBlur = 18;
+  ctx.beginPath();
+  ctx.arc(x, y, 9, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 1.5;
+  ctx.globalAlpha = 0.85;
+  ctx.shadowBlur = 0;
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawLaser(l, i) {
+  const rad = l.angle * Math.PI / 180;
+  const dx = Math.cos(rad), dy = Math.sin(rad);
+
+  ctx.save();
+  ctx.fillStyle = l.color;
+  ctx.shadowColor = l.color;
+  ctx.shadowBlur = 12;
+  ctx.beginPath();
+  ctx.arc(l.x, l.y, 8, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 1.5;
+  ctx.shadowBlur = 0;
+  ctx.globalAlpha = 0.9;
+  ctx.stroke();
+
+  ctx.fillStyle = '#0a0e1a';
+  ctx.font = 'bold 10px sans-serif';
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(String(i + 1), l.x, l.y);
+  ctx.textAlign = 'start';
+  ctx.textBaseline = 'alphabetic';
+
+  // Direction arrow
+  const ax = l.x + dx * 30;
+  const ay = l.y + dy * 30;
+  ctx.strokeStyle = l.color;
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(l.x + dx * 11, l.y + dy * 11);
+  ctx.lineTo(ax, ay);
+  ctx.stroke();
+  ctx.fillStyle = l.color;
+  const ah = 7;
+  const px = -dy, py = dx;
+  ctx.beginPath();
+  ctx.moveTo(ax + dx * ah, ay + dy * ah);
+  ctx.lineTo(ax + px * ah * 0.6, ay + py * ah * 0.6);
+  ctx.lineTo(ax - px * ah * 0.6, ay - py * ah * 0.6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+// ─── Hit testing ───────────────────────────────────────────────────────────
+
+function hitTestRotationHandle(px, py) {
+  if (!selectedEl) return false;
+  const { perp } = elementBasis(selectedEl);
+  const d = selectedEl.size / 2 + 36;
+  const hx = selectedEl.x + perp.x * d;
+  const hy = selectedEl.y + perp.y * d;
+  return Math.hypot(px - hx, py - hy) < 14;
+}
+
+function hitTestLaserOrigin(px, py) {
+  for (const l of lasers) {
+    if (Math.hypot(px - l.x, py - l.y) < 13) return l;
+  }
+  return null;
+}
+
+function hitTestLaserArrow(px, py) {
+  for (const l of lasers) {
+    const rad = l.angle * Math.PI / 180;
+    const ax = l.x + Math.cos(rad) * 30;
+    const ay = l.y + Math.sin(rad) * 30;
+    if (Math.hypot(px - ax, py - ay) < 14) return l;
+  }
+  return null;
+}
+
+function hitTestLight(px, py) {
+  if (!lightSource.active) return false;
+  return Math.hypot(px - lightSource.x, py - lightSource.y) < 14;
+}
+
+function hitTestElement(px, py) {
+  for (let i = elements.length - 1; i >= 0; i--) {
+    const el = elements[i];
+    const dx = px - el.x, dy = py - el.y;
+    const { along, perp } = elementBasis(el);
+    const localX = dx * along.x + dy * along.y;
+    const localY = dx * perp.x + dy * perp.y;
+    if (Math.abs(localX) < el.size / 2 + 12 && Math.abs(localY) < 20) return el;
+  }
+  return null;
+}
+
+// ─── Pointer events ────────────────────────────────────────────────────────
+
+function getCanvasPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const t = e.touches ? e.touches[0] : e;
+  return { x: t.clientX - rect.left, y: t.clientY - rect.top };
+}
+
+function onPointerDown(e) {
+  const pos = getCanvasPos(e);
+
+  if (hitTestRotationHandle(pos.x, pos.y)) {
+    dragMode = 'rotate';
+    dragTarget = selectedEl;
+    canvas.style.cursor = 'grabbing';
+    return;
+  }
+
+  let l = hitTestLaserArrow(pos.x, pos.y);
+  if (l) {
+    dragMode = 'laserAngle';
+    dragTarget = l;
+    canvas.style.cursor = 'grabbing';
+    return;
+  }
+
+  l = hitTestLaserOrigin(pos.x, pos.y);
+  if (l) {
+    dragMode = 'laserOrigin';
+    dragTarget = l;
+    dragOffset = { x: pos.x - l.x, y: pos.y - l.y };
+    canvas.style.cursor = 'grabbing';
+    return;
+  }
+
+  if (hitTestLight(pos.x, pos.y)) {
+    dragMode = 'light';
+    dragOffset = { x: pos.x - lightSource.x, y: pos.y - lightSource.y };
+    canvas.style.cursor = 'grabbing';
+    return;
+  }
+
+  const el = hitTestElement(pos.x, pos.y);
+  if (el) {
+    selectElement(el);
+    dragMode = 'element';
+    dragTarget = el;
+    dragOffset = { x: pos.x - el.x, y: pos.y - el.y };
+    canvas.style.cursor = 'grabbing';
+    return;
+  }
+
+  selectedEl = null;
+  renderList();
+  renderProps();
+  render();
+}
+
+function onPointerMove(e) {
+  const pos = getCanvasPos(e);
+
+  if (!dragMode) {
+    let cur = 'crosshair';
+    if (hitTestRotationHandle(pos.x, pos.y) ||
+        hitTestLaserArrow(pos.x, pos.y) ||
+        hitTestLaserOrigin(pos.x, pos.y) ||
+        hitTestLight(pos.x, pos.y) ||
+        hitTestElement(pos.x, pos.y)) cur = 'grab';
+    canvas.style.cursor = cur;
+    return;
+  }
+
+  if (dragMode === 'element') {
+    dragTarget.x = pos.x - dragOffset.x;
+    dragTarget.y = pos.y - dragOffset.y;
+    renderList();
+    render();
+  } else if (dragMode === 'rotate') {
+    const dx = pos.x - dragTarget.x;
+    const dy = pos.y - dragTarget.y;
+    // Handle is positioned at +perp direction. perp = (sin(a), -cos(a)).
+    // So if handle vector from element is (hx, hy), then sin(a) = hx/d, -cos(a) = hy/d
+    // → a = atan2(hx, -hy)
+    dragTarget.angle = Math.atan2(dx, -dy);
+    renderList();
+    renderProps();
+    render();
+  } else if (dragMode === 'light') {
+    lightSource.x = pos.x - dragOffset.x;
+    lightSource.y = pos.y - dragOffset.y;
+    render();
+  } else if (dragMode === 'laserOrigin') {
+    dragTarget.x = pos.x - dragOffset.x;
+    dragTarget.y = pos.y - dragOffset.y;
+    render();
+  } else if (dragMode === 'laserAngle') {
+    const dx = pos.x - dragTarget.x;
+    const dy = pos.y - dragTarget.y;
+    dragTarget.angle = Math.atan2(dy, dx) * 180 / Math.PI;
+    renderLaserControls();
+    render();
+  }
+}
+
+function onPointerUp() {
+  dragMode = null;
+  dragTarget = null;
+  canvas.style.cursor = 'crosshair';
+}
+
+canvas.addEventListener('mousedown', onPointerDown);
+canvas.addEventListener('mousemove', onPointerMove);
+canvas.addEventListener('mouseup', onPointerUp);
+canvas.addEventListener('mouseleave', onPointerUp);
+canvas.addEventListener('touchstart', e => { e.preventDefault(); onPointerDown(e); }, { passive: false });
+canvas.addEventListener('touchmove', e => { e.preventDefault(); onPointerMove(e); }, { passive: false });
+canvas.addEventListener('touchend', onPointerUp);
+
+// ─── Init ──────────────────────────────────────────────────────────────────
+
+function init() {
+  resize();
+
+  // Default: concave mirror facing left, with parallel rays from left
+  // For concave mirror facing left: front (+perp) should point in -x direction
+  // perp = (sin(a), -cos(a)). For perp = (-1, 0): sin(a)=-1, -cos(a)=0 → a=-π/2
+  elements.push({
+    id: nextId++, type: 'concave_mirror',
+    x: W * 0.7, y: H * 0.5,
+    size: 220, radius: 320,
+    angle: -Math.PI / 2,
+    diffuse: false
+  });
+
+  // 3 parallel lasers from left
+  for (let i = 0; i < 3; i++) {
+    lasers.push({
+      id: nextLaserId++,
+      x: 80,
+      y: H * 0.5 - 60 + i * 60,
+      angle: 0,
+      color: LASER_COLORS[i]
+    });
+  }
+
+  lightSource.x = W * 0.2;
+  lightSource.y = H * 0.5;
+
+  renderList();
+  renderProps();
+  renderLaserControls();
+  render();
+}
+
+window.addEventListener('resize', resize);
+init();
+</script>
+</body>
+</html>

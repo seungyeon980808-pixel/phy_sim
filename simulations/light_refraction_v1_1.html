@@ -1,0 +1,1198 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<!-- 빛의 굴절 시뮬레이션 v1.1 -->
+<title>빛의 굴절 시뮬레이션</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+    background: #1a1d24;
+    color: #e8eaed;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  }
+  /* [1] canvas-wrapper wraps canvas-area + scrollbar on the right */
+  #canvas-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  #canvas-area {
+    flex: 1;
+    position: relative;
+    background: #0f1115;
+    overflow: hidden;
+  }
+  canvas { display: block; cursor: crosshair; }
+
+  /* [1] panel moved left: border-right instead of border-left */
+  #control-panel {
+    width: 320px;
+    background: #22252d;
+    padding: 18px;
+    overflow-y: auto;
+    border-right: 1px solid #333842;
+  }
+  h1 {
+    font-size: 18px;
+    margin-bottom: 16px;
+    color: #fff;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #4a9eff;
+  }
+  .section {
+    background: #2b2f38;
+    border-radius: 8px;
+    padding: 14px;
+    margin-bottom: 12px;
+  }
+  .section-title {
+    font-size: 13px;
+    font-weight: bold;
+    color: #4a9eff;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 13px;
+  }
+  .row label {
+    flex: 1;
+    color: #c5c8ce;
+  }
+  .row select, .row input[type="number"] {
+    background: #1a1d24;
+    color: #fff;
+    border: 1px solid #444a56;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 13px;
+    width: 110px;
+  }
+  /* [3] compact number input for angle/rotation sliders */
+  .row input[type="number"].num-small {
+    width: 56px;
+    padding: 4px 4px;
+    margin-left: 4px;
+  }
+  .row input[type="range"] {
+    width: 110px;
+  }
+  .row input[type="color"] {
+    width: 40px;
+    height: 24px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+  }
+  .row .value {
+    color: #4a9eff;
+    font-weight: bold;
+    margin-left: 6px;
+    min-width: 40px;
+    text-align: right;
+  }
+  .checkbox-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 6px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .checkbox-row input { margin-right: 8px; }
+  .checkbox-row label { cursor: pointer; }
+
+  button {
+    background: #4a9eff;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 14px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: bold;
+    transition: background 0.15s;
+  }
+  button:hover { background: #5badff; }
+  button.danger { background: #e74c3c; }
+  button.danger:hover { background: #ec6051; }
+  button.secondary { background: #4a5260; }
+  button.secondary:hover { background: #5a6270; }
+
+  #info-readout {
+    background: rgba(15, 17, 21, 0.92);
+    border: 1px solid #4a9eff;
+    border-radius: 6px;
+    padding: 10px 14px;
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    font-size: 13px;
+    line-height: 1.7;
+    pointer-events: none;
+    color: #fff;
+    min-width: 220px;
+  }
+  #info-readout .key { color: #8e9aaf; }
+  #info-readout .val { color: #4a9eff; font-weight: bold; }
+  #info-readout .tir { color: #ff6b6b; font-weight: bold; }
+
+  #legend {
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    background: rgba(15, 17, 21, 0.92);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 12px;
+    line-height: 1.6;
+    pointer-events: none;
+  }
+  #legend .item { display: flex; align-items: center; margin-bottom: 2px; }
+  #legend .swatch { width: 24px; height: 2px; margin-right: 8px; }
+
+  .help {
+    font-size: 11px;
+    color: #888d97;
+    line-height: 1.5;
+    margin-top: 6px;
+  }
+
+  /* [2] horizontal scrollbar */
+  #scrollbar-track {
+    background: #1a1d24;
+    height: 14px;
+    border-top: 1px solid #333842;
+    position: relative;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  #scrollbar-thumb {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    background: #4a9eff;
+    border-radius: 7px;
+    min-width: 40px;
+    cursor: grab;
+  }
+  #scrollbar-thumb:active { cursor: grabbing; }
+</style>
+</head>
+<body>
+
+<!-- [1] control panel is now first in DOM → renders on the LEFT -->
+<div id="control-panel">
+  <h1>🔬 빛의 굴절 실험</h1>
+
+  <div class="section">
+    <div class="section-title">📡 레이저</div>
+    <div class="row">
+      <label>색상</label>
+      <input type="color" id="laserColor" value="#ff3a3a">
+    </div>
+    <div class="row">
+      <label>광선 굵기</label>
+      <input type="range" id="laserWidth" min="1" max="5" step="0.5" value="2">
+      <span class="value" id="laserWidthVal">2</span>
+    </div>
+    <!-- [3] angle slider row with added number input -->
+    <div class="row">
+      <label>입사각 미세조정</label>
+      <input type="range" id="angleSlider" min="-89" max="89" step="0.5" value="-30">
+      <input type="number" id="angleNum" class="num-small" min="-89" max="89" step="0.5" value="-30">
+      <span class="value" id="angleVal">30°</span>
+    </div>
+    <div class="help">캔버스의 레이저(빨간 동그라미)와 화살촉을 직접 드래그해서 위치와 각도를 바꿀 수도 있어요.</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">🌊 매질 설정</div>
+    <div class="row">
+      <label>위쪽 매질</label>
+      <select id="mediumTop">
+        <option value="1.00">공기 (n=1.00)</option>
+        <option value="1.33">물 (n=1.33)</option>
+        <option value="1.50">유리 (n=1.50)</option>
+        <option value="1.52">크라운유리 (n=1.52)</option>
+        <option value="2.42">다이아몬드 (n=2.42)</option>
+        <option value="custom">직접 입력</option>
+      </select>
+    </div>
+    <div class="row" id="customTopRow" style="display:none">
+      <label>n₁ 값</label>
+      <input type="number" id="mediumTopCustom" min="1" max="3" step="0.01" value="1.00">
+    </div>
+    <div class="row">
+      <label>아래쪽 매질</label>
+      <select id="mediumBot">
+        <option value="1.00">공기 (n=1.00)</option>
+        <option value="1.33" selected>물 (n=1.33)</option>
+        <option value="1.50">유리 (n=1.50)</option>
+        <option value="1.52">크라운유리 (n=1.52)</option>
+        <option value="2.42">다이아몬드 (n=2.42)</option>
+        <option value="custom">직접 입력</option>
+      </select>
+    </div>
+    <div class="row" id="customBotRow" style="display:none">
+      <label>n₂ 값</label>
+      <input type="number" id="mediumBotCustom" min="1" max="3" step="0.01" value="1.33">
+    </div>
+    <!-- [3] boundary rotation row with added number input -->
+    <div class="row">
+      <label>경계면 회전</label>
+      <input type="range" id="boundaryRot" min="-45" max="45" step="1" value="0">
+      <input type="number" id="boundaryRotNum" class="num-small" min="-45" max="45" step="1" value="0">
+      <span class="value" id="boundaryRotVal">0°</span>
+    </div>
+    <div class="help">경계면 양 끝의 사각 핸들을 드래그해서 위치/크기를 바꿀 수 있어요.</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">📐 각도기</div>
+    <div class="checkbox-row">
+      <input type="checkbox" id="showProtractor" checked>
+      <label for="showProtractor">각도기 표시</label>
+    </div>
+    <div class="row">
+      <label>각도기 크기</label>
+      <input type="range" id="protractorSize" min="80" max="220" step="5" value="140">
+      <span class="value" id="protractorSizeVal">140</span>
+    </div>
+    <div class="help">각도기는 입사점(P)을 중심으로 자동으로 따라가요.</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">👁️ 표시 옵션</div>
+    <div class="checkbox-row">
+      <input type="checkbox" id="showNormal" checked>
+      <label for="showNormal">법선 표시</label>
+    </div>
+    <div class="checkbox-row">
+      <input type="checkbox" id="showRefracted" checked>
+      <label for="showRefracted">굴절 광선 표시</label>
+    </div>
+    <div class="checkbox-row">
+      <input type="checkbox" id="showReflected" checked>
+      <label for="showReflected">반사 광선 표시</label>
+    </div>
+    <div class="checkbox-row">
+      <input type="checkbox" id="showStraight" checked>
+      <label for="showStraight">원래 진행 방향(직진 가상선) 표시</label>
+    </div>
+    <div class="checkbox-row">
+      <input type="checkbox" id="showIncidencePoint" checked>
+      <label for="showIncidencePoint">입사점 강조</label>
+    </div>
+    <div class="checkbox-row">
+      <input type="checkbox" id="showAngleArc" checked>
+      <label for="showAngleArc">각도 호(arc) 표시</label>
+    </div>
+  </div>
+
+  <div class="section">
+    <button id="resetBtn" class="danger">초기화</button>
+    <button id="swapBtn" class="secondary" style="margin-left:6px">매질 바꾸기 ⇅</button>
+  </div>
+</div>
+
+<!-- [2] canvas-wrapper contains canvas-area + scrollbar -->
+<div id="canvas-wrapper">
+  <div id="canvas-area">
+    <canvas id="canvas"></canvas>
+    <div id="info-readout"></div>
+    <div id="legend">
+      <div class="item"><div class="swatch" style="background:#ff3a3a"></div>입사 광선</div>
+      <div class="item"><div class="swatch" style="background:#ffb84a"></div>굴절 광선</div>
+      <div class="item"><div class="swatch" style="background:#3ad1ff"></div>반사 광선</div>
+      <div class="item"><div class="swatch" style="background:#888;border-top:1px dashed #aaa;height:0"></div>법선</div>
+      <div class="item"><div class="swatch" style="background:#666;border-top:1px dashed #666;height:0"></div>직진 가상선</div>
+    </div>
+  </div>
+  <!-- [2] horizontal scrollbar track -->
+  <div id="scrollbar-track">
+    <div id="scrollbar-thumb"></div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   빛의 굴절 시뮬레이션 (중2 과학)  v1.1
+   ========================================================= */
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const info = document.getElementById('info-readout');
+
+let W, H;
+
+/* [2] panning state */
+const LOGICAL_WIDTH = 1600;
+const MAX_PAN = 800;
+let panX = 0;
+
+function resize() {
+  const area = document.getElementById('canvas-area');
+  W = canvas.width = area.clientWidth;
+  H = canvas.height = area.clientHeight;
+  draw();
+}
+window.addEventListener('resize', resize);
+
+/* ----- 상태 변수 ----- */
+const state = {
+  // 레이저: 광원 위치와 광선이 향하는 끝점(드래그 핸들)
+  laser: { x: 220, y: 140, tipX: 470, tipY: 320 },
+  // 경계면 두 끝점 (회전/크기 핸들 역할)
+  boundary: { x1: 80, y1: 360, x2: 760, y2: 360 },
+  // 매질 굴절률
+  n1: 1.00,
+  n2: 1.33,
+  // 색상/굵기
+  laserColor: '#ff3a3a',
+  laserWidth: 2,
+  // 표시 옵션
+  show: {
+    protractor: true,
+    normal: true,
+    refracted: true,
+    reflected: true,
+    straight: true,
+    incidencePoint: true,
+    angleArc: true,
+  },
+  protractorSize: 140,
+};
+
+/* ----- 유틸 ----- */
+const TAU = Math.PI * 2;
+function dist(ax, ay, bx, by) { return Math.hypot(ax-bx, ay-by); }
+function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+function toDeg(r) { return r * 180 / Math.PI; }
+function toRad(d) { return d * Math.PI / 180; }
+
+/* 경계면 기하학 계산 */
+function getBoundaryGeom() {
+  const { x1, y1, x2, y2 } = state.boundary;
+  const dx = x2 - x1, dy = y2 - y1;
+  const len = Math.hypot(dx, dy);
+  const tx = dx / len, ty = dy / len;       // 경계면 방향 단위벡터
+  // 법선: 경계면 수직, 위쪽(y가 작아지는 쪽)을 +방향으로
+  let nx = -ty, ny = tx;
+  if (ny > 0) { nx = -nx; ny = -ny; } // 법선이 항상 "위쪽"을 향하게
+  return { x1, y1, x2, y2, tx, ty, nx, ny, len };
+}
+
+/* 두 직선의 교차점: P + t*d ,  Q + s*e */
+function lineLineIntersect(px, py, dx, dy, qx, qy, ex, ey) {
+  const denom = dx * ey - dy * ex;
+  if (Math.abs(denom) < 1e-9) return null;
+  const t = ((qx - px) * ey - (qy - py) * ex) / denom;
+  const s = ((qx - px) * dy - (qy - py) * dx) / denom;
+  return { x: px + t * dx, y: py + t * dy, t, s };
+}
+
+/* 점이 경계면 기준으로 위쪽(n1)인지 아래쪽(n2)인지 */
+function whichSide(x, y) {
+  const g = getBoundaryGeom();
+  const rx = x - g.x1, ry = y - g.y1;
+  const dot = rx * g.nx + ry * g.ny;  // 법선 방향 투영
+  return dot >= 0 ? 'top' : 'bot';
+}
+
+/* ----- 광선 계산 (스넬의 법칙) ----- */
+function computeRays() {
+  const g = getBoundaryGeom();
+  const laser = state.laser;
+
+  // 입사 광선 방향
+  const dx = laser.tipX - laser.x;
+  const dy = laser.tipY - laser.y;
+  const dlen = Math.hypot(dx, dy);
+  if (dlen < 1e-6) return null;
+  const ix = dx / dlen, iy = dy / dlen;
+
+  // 광원이 어느 쪽에 있는지에 따라 입사 매질의 굴절률 결정
+  const sourceSide = whichSide(laser.x, laser.y);
+  const n_i = sourceSide === 'top' ? state.n1 : state.n2;
+  const n_t = sourceSide === 'top' ? state.n2 : state.n1;
+
+  // 입사 광선이 경계면과 만나는 점 P
+  const inter = lineLineIntersect(
+    laser.x, laser.y, ix, iy,
+    g.x1, g.y1, g.tx, g.ty
+  );
+  if (!inter || inter.t < 0) return { hits: false, ix, iy, sourceSide, n_i, n_t };
+  // 경계선의 유한한 구간 내에 있는지 확인
+  if (inter.s < 0 || inter.s > g.len) return { hits: false, ix, iy, sourceSide, n_i, n_t };
+
+  const Px = inter.x, Py = inter.y;
+
+  // 법선 방향: 광원이 있는 쪽을 향하도록
+  let nx = g.nx, ny = g.ny;
+  if (sourceSide === 'bot') { nx = -nx; ny = -ny; }
+
+  // 입사각 계산: 입사광선의 반대벡터와 법선의 사이각
+  const cosThetaI = -(ix * nx + iy * ny); // -I·N (=cos θ_i, 0 to 1)
+  const thetaI = Math.acos(clamp(cosThetaI, -1, 1));
+
+  // 반사벡터: R = I - 2(I·N)N
+  const idotn = ix * nx + iy * ny;
+  const rx = ix - 2 * idotn * nx;
+  const ry = iy - 2 * idotn * ny;
+
+  // 굴절(스넬): sin θt = (n_i/n_t) sin θi
+  const eta = n_i / n_t;
+  const sin2t = eta * eta * (1 - cosThetaI * cosThetaI);
+  let refractData = null;
+  let tir = false;
+  if (sin2t > 1) {
+    tir = true; // 전반사
+  } else {
+    const cosThetaT = Math.sqrt(1 - sin2t);
+    // 굴절광선: T = eta*I + (eta*cosθi - cosθt) * N
+    const tdx = eta * ix + (eta * cosThetaI - cosThetaT) * nx;
+    const tdy = eta * iy + (eta * cosThetaI - cosThetaT) * ny;
+    const thetaT = Math.acos(clamp(cosThetaT, -1, 1));
+    refractData = { dx: tdx, dy: tdy, theta: thetaT };
+  }
+
+  return {
+    hits: true,
+    P: { x: Px, y: Py },
+    ix, iy,
+    sourceSide,
+    n_i, n_t,
+    nx, ny,         // 광원 방향 법선
+    thetaI,
+    reflect: { dx: rx, dy: ry },
+    refract: refractData,
+    tir,
+  };
+}
+
+/* ====================================================
+   스크롤바 갱신
+   ==================================================== */
+function updateScrollbar() {
+  const track = document.getElementById('scrollbar-track');
+  const thumb = document.getElementById('scrollbar-thumb');
+  const trackWidth = track.clientWidth;
+  if (!trackWidth) return;
+  const thumbWidth = Math.max(40, (W / LOGICAL_WIDTH) * trackWidth);
+  const maxLeft = trackWidth - thumbWidth;
+  const thumbLeft = maxLeft > 0 ? (panX / MAX_PAN) * maxLeft : 0;
+  thumb.style.width = thumbWidth + 'px';
+  thumb.style.left = thumbLeft + 'px';
+}
+
+/* ====================================================
+   그리기
+   ==================================================== */
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  /* [2] apply horizontal pan */
+  ctx.save();
+  ctx.translate(-panX, 0);
+  drawMediums();
+  drawBoundary();
+  if (state.show.protractor) drawProtractor();
+  drawRays();
+  drawLaser();
+  ctx.restore();
+  updateInfo();
+  updateScrollbar();
+}
+
+/* 매질 영역 색칠 */
+function drawMediums() {
+  const g = getBoundaryGeom();
+  const c1 = mediumColor(state.n1);
+  const c2 = mediumColor(state.n2);
+
+  const farT = 4000;
+  const Ax = g.x1 - g.tx * farT, Ay = g.y1 - g.ty * farT;
+  const Bx = g.x2 + g.tx * farT, By = g.y2 + g.ty * farT;
+  const off = farT;
+  ctx.fillStyle = c1;
+  ctx.beginPath();
+  ctx.moveTo(Ax, Ay);
+  ctx.lineTo(Bx, By);
+  ctx.lineTo(Bx + g.nx * off, By + g.ny * off);
+  ctx.lineTo(Ax + g.nx * off, Ay + g.ny * off);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = c2;
+  ctx.beginPath();
+  ctx.moveTo(Ax, Ay);
+  ctx.lineTo(Bx, By);
+  ctx.lineTo(Bx - g.nx * off, By - g.ny * off);
+  ctx.lineTo(Ax - g.nx * off, Ay - g.ny * off);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function mediumColor(n) {
+  const t = clamp((n - 1.0) / 1.5, 0, 1);
+  const r = Math.round(15 + (30 - 15) * t);
+  const g = Math.round(17 + (70 - 17) * t);
+  const b = Math.round(21 + (110 - 21) * t);
+  return `rgb(${r},${g},${b})`;
+}
+
+/* 경계면 + 핸들 */
+function drawBoundary() {
+  const g = getBoundaryGeom();
+  ctx.strokeStyle = '#9aa5b8';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(g.x1, g.y1);
+  ctx.lineTo(g.x2, g.y2);
+  ctx.stroke();
+
+  drawSquareHandle(g.x1, g.y1, '#9aa5b8');
+  drawSquareHandle(g.x2, g.y2, '#9aa5b8');
+
+  ctx.font = 'bold 13px sans-serif';
+  ctx.fillStyle = '#c5c8ce';
+  const midx = (g.x1 + g.x2) / 2;
+  const midy = (g.y1 + g.y2) / 2;
+  ctx.fillText(`n₁ = ${state.n1.toFixed(2)}`, midx + g.nx * 30 - 30, midy + g.ny * 30);
+  ctx.fillText(`n₂ = ${state.n2.toFixed(2)}`, midx - g.nx * 30 - 30, midy - g.ny * 30);
+}
+
+function drawSquareHandle(x, y, color) {
+  ctx.fillStyle = color;
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 1.5;
+  ctx.fillRect(x - 6, y - 6, 12, 12);
+  ctx.strokeRect(x - 6, y - 6, 12, 12);
+}
+
+/* 광선 그리기 */
+function drawRays() {
+  const r = computeRays();
+  if (!r) return;
+
+  const incEnd = r.hits ? r.P : { x: state.laser.tipX, y: state.laser.tipY };
+  drawRayLine(state.laser.x, state.laser.y, incEnd.x, incEnd.y,
+              state.laserColor, state.laserWidth, true);
+
+  if (!r.hits) return;
+
+  const P = r.P;
+
+  if (state.show.normal) {
+    const NL = 90;
+    ctx.save();
+    ctx.strokeStyle = '#c8cdd6';
+    ctx.lineWidth = 1.2;
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    ctx.moveTo(P.x - r.nx * NL, P.y - r.ny * NL);
+    ctx.lineTo(P.x + r.nx * NL, P.y + r.ny * NL);
+    ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = '#c8cdd6';
+    ctx.font = '12px sans-serif';
+    ctx.fillText('법선', P.x + r.nx * (NL + 4), P.y + r.ny * (NL + 4));
+  }
+
+  if (state.show.straight) {
+    const SL = 260;
+    ctx.save();
+    ctx.strokeStyle = '#666c78';
+    ctx.lineWidth = 1.2;
+    ctx.setLineDash([3, 6]);
+    ctx.beginPath();
+    ctx.moveTo(P.x, P.y);
+    ctx.lineTo(P.x + r.ix * SL, P.y + r.iy * SL);
+    ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = '#888d97';
+    ctx.font = 'italic 11px sans-serif';
+    ctx.fillText('직진 가상선', P.x + r.ix * (SL - 30), P.y + r.iy * (SL - 30) - 4);
+  }
+
+  if (state.show.reflected) {
+    const RL = 240;
+    drawRayLine(P.x, P.y, P.x + r.reflect.dx * RL, P.y + r.reflect.dy * RL,
+                '#3ad1ff', state.laserWidth, true);
+  }
+
+  if (!r.tir && r.refract && state.show.refracted) {
+    const TL = 240;
+    drawRayLine(P.x, P.y, P.x + r.refract.dx * TL, P.y + r.refract.dy * TL,
+                '#ffb84a', state.laserWidth, true);
+  }
+
+  if (state.show.angleArc) {
+    drawAngleArcs(r);
+  }
+
+  if (state.show.incidencePoint) {
+    ctx.save();
+    ctx.fillStyle = '#ffeb3b';
+    ctx.strokeStyle = '#1a1d24';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(P.x, P.y, 6, 0, TAU);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#ffeb3b';
+    ctx.font = 'bold 13px sans-serif';
+    ctx.fillText('P', P.x + 9, P.y - 9);
+    ctx.restore();
+  }
+}
+
+function drawRayLine(x1, y1, x2, y2, color, w, arrow) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = w;
+  ctx.lineCap = 'round';
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 6;
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+  ctx.restore();
+
+  if (arrow) {
+    drawArrowhead(x1, y1, x2, y2, color);
+  }
+}
+
+function drawArrowhead(x1, y1, x2, y2, color) {
+  const ang = Math.atan2(y2 - y1, x2 - x1);
+  const len = 10;
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - len * Math.cos(ang - 0.4), y2 - len * Math.sin(ang - 0.4));
+  ctx.lineTo(x2 - len * Math.cos(ang + 0.4), y2 - len * Math.sin(ang + 0.4));
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+/* 각도 호 그리기: 입사각, 반사각, 굴절각 */
+function drawAngleArcs(r) {
+  const P = r.P;
+  const arcR = 38;
+
+  const normalAng = Math.atan2(r.ny, r.nx);
+  const incomingAng = Math.atan2(-r.iy, -r.ix);
+  const reflectAng = Math.atan2(r.reflect.dy, r.reflect.dx);
+
+  drawArc(P.x, P.y, arcR, normalAng, incomingAng, '#ff3a3a', `θ₁=${toDeg(r.thetaI).toFixed(1)}°`);
+  drawArc(P.x, P.y, arcR + 6, normalAng, reflectAng, '#3ad1ff', `θ'=${toDeg(r.thetaI).toFixed(1)}°`);
+
+  if (!r.tir && r.refract) {
+    const refractAng = Math.atan2(r.refract.dy, r.refract.dx);
+    const minusNormalAng = Math.atan2(-r.ny, -r.nx);
+    drawArc(P.x, P.y, arcR, minusNormalAng, refractAng, '#ffb84a', `θ₂=${toDeg(r.refract.theta).toFixed(1)}°`);
+  }
+}
+
+function drawArc(cx, cy, rad, a1, a2, color, label) {
+  let diff = a2 - a1;
+  while (diff > Math.PI) diff -= TAU;
+  while (diff < -Math.PI) diff += TAU;
+  const start = a1, end = a1 + diff;
+
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(cx, cy, rad, Math.min(start, end), Math.max(start, end));
+  ctx.stroke();
+
+  const midAng = (start + end) / 2;
+  const lx = cx + (rad + 16) * Math.cos(midAng);
+  const ly = cy + (rad + 16) * Math.sin(midAng);
+  ctx.fillStyle = color;
+  ctx.font = 'bold 12px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, lx, ly);
+  ctx.restore();
+}
+
+/* 각도기 (입사점 P 중심) */
+function drawProtractor() {
+  const r = computeRays();
+  let cx, cy, baseAng;
+  if (r && r.hits) {
+    cx = r.P.x; cy = r.P.y;
+    const g = getBoundaryGeom();
+    baseAng = Math.atan2(g.ty, g.tx);
+  } else {
+    const g = getBoundaryGeom();
+    cx = (g.x1 + g.x2) / 2;
+    cy = (g.y1 + g.y2) / 2;
+    baseAng = Math.atan2(g.ty, g.tx);
+  }
+
+  const R = state.protractorSize;
+
+  ctx.save();
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+  ctx.lineWidth = 1.5;
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, 0, TAU);
+  ctx.fill();
+  ctx.stroke();
+
+  for (let deg = 0; deg < 360; deg += 5) {
+    const isMajor = deg % 10 === 0;
+    const isHuge = deg % 30 === 0;
+    const ang = baseAng + toRad(deg);
+    const inner = isHuge ? R - 14 : (isMajor ? R - 10 : R - 5);
+    const outer = R;
+    ctx.beginPath();
+    ctx.strokeStyle = isMajor ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.35)';
+    ctx.lineWidth = isHuge ? 1.5 : 1;
+    ctx.moveTo(cx + inner * Math.cos(ang), cy + inner * Math.sin(ang));
+    ctx.lineTo(cx + outer * Math.cos(ang), cy + outer * Math.sin(ang));
+    ctx.stroke();
+    if (isHuge) {
+      let normalDeg = (deg + 90) % 360;
+      let labelDeg;
+      if (normalDeg <= 90) labelDeg = normalDeg;
+      else if (normalDeg <= 180) labelDeg = 180 - normalDeg;
+      else if (normalDeg <= 270) labelDeg = normalDeg - 180;
+      else labelDeg = 360 - normalDeg;
+      const lx = cx + (R - 24) * Math.cos(ang);
+      const ly = cy + (R - 24) * Math.sin(ang);
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.font = '10px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(labelDeg.toString(), lx, ly);
+    }
+  }
+
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.beginPath();
+  ctx.arc(cx, cy, 3, 0, TAU);
+  ctx.fill();
+  ctx.restore();
+}
+
+/* 레이저(광원) 그리기 + 끝점 핸들 */
+function drawLaser() {
+  const { x, y, tipX, tipY } = state.laser;
+  ctx.save();
+  ctx.fillStyle = state.laserColor;
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(x, y, 12, 0, TAU);
+  ctx.fill();
+  ctx.stroke();
+  const ang = Math.atan2(tipY - y, tipX - x);
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.moveTo(x + 6 * Math.cos(ang), y + 6 * Math.sin(ang));
+  ctx.lineTo(x + 6 * Math.cos(ang + 2.5), y + 6 * Math.sin(ang + 2.5));
+  ctx.lineTo(x + 6 * Math.cos(ang - 2.5), y + 6 * Math.sin(ang - 2.5));
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = state.laserColor;
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(tipX, tipY, 6, 0, TAU);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 11px sans-serif';
+  ctx.fillText('레이저', x - 16, y - 18);
+}
+
+/* 정보 표시 */
+function updateInfo() {
+  const r = computeRays();
+  let html = '';
+  if (!r || !r.hits) {
+    html = `<div><span class="key">입사 광선이 경계면에 닿지 않습니다.</span></div>
+            <div><span class="key">레이저를 움직여 보세요.</span></div>`;
+  } else {
+    const ang1 = toDeg(r.thetaI);
+    const sin1 = Math.sin(r.thetaI);
+    html = `
+      <div><span class="key">n₁ → n₂:</span> <span class="val">${r.n_i.toFixed(2)} → ${r.n_t.toFixed(2)}</span></div>
+      <div><span class="key">입사각 θ₁:</span> <span class="val">${ang1.toFixed(1)}°</span></div>
+      <div><span class="key">반사각 θ':</span> <span class="val">${ang1.toFixed(1)}°</span></div>
+    `;
+    if (r.tir) {
+      html += `<div><span class="tir">⚠ 전반사 발생!</span></div>
+               <div><span class="key">임계각 = ${toDeg(Math.asin(r.n_t/r.n_i)).toFixed(1)}°</span></div>`;
+    } else {
+      const ang2 = toDeg(r.refract.theta);
+      html += `<div><span class="key">굴절각 θ₂:</span> <span class="val">${ang2.toFixed(1)}°</span></div>
+               <div><span class="key">n₁ sin θ₁:</span> ${(r.n_i * sin1).toFixed(3)}</div>
+               <div><span class="key">n₂ sin θ₂:</span> ${(r.n_t * Math.sin(r.refract.theta)).toFixed(3)}</div>`;
+    }
+  }
+  info.innerHTML = html;
+}
+
+/* ====================================================
+   드래그 인터랙션
+   ==================================================== */
+let drag = null;
+
+canvas.addEventListener('mousedown', e => {
+  const { x, y } = getMouse(e);
+  if (dist(x, y, state.laser.tipX, state.laser.tipY) < 14) {
+    drag = { type: 'laserTip' };
+  } else if (dist(x, y, state.laser.x, state.laser.y) < 14) {
+    drag = { type: 'laser', ox: x - state.laser.x, oy: y - state.laser.y,
+             otx: x - state.laser.tipX, oty: y - state.laser.tipY };
+  } else if (dist(x, y, state.boundary.x1, state.boundary.y1) < 12) {
+    drag = { type: 'b1' };
+  } else if (dist(x, y, state.boundary.x2, state.boundary.y2) < 12) {
+    drag = { type: 'b2' };
+  }
+});
+
+canvas.addEventListener('mousemove', e => {
+  const { x, y } = getMouse(e);
+  if (!drag) {
+    let cursor = 'crosshair';
+    if (dist(x, y, state.laser.tipX, state.laser.tipY) < 14
+        || dist(x, y, state.laser.x, state.laser.y) < 14
+        || dist(x, y, state.boundary.x1, state.boundary.y1) < 12
+        || dist(x, y, state.boundary.x2, state.boundary.y2) < 12) {
+      cursor = 'grab';
+    }
+    canvas.style.cursor = cursor;
+    return;
+  }
+  canvas.style.cursor = 'grabbing';
+
+  if (drag.type === 'laserTip') {
+    state.laser.tipX = x;
+    state.laser.tipY = y;
+    syncAngleSliderFromLaser();
+  } else if (drag.type === 'laser') {
+    const nx = x - drag.ox, ny = y - drag.oy;
+    const dx = state.laser.tipX - state.laser.x;
+    const dy = state.laser.tipY - state.laser.y;
+    state.laser.x = nx;
+    state.laser.y = ny;
+    state.laser.tipX = nx + dx;
+    state.laser.tipY = ny + dy;
+  } else if (drag.type === 'b1') {
+    state.boundary.x1 = x;
+    state.boundary.y1 = y;
+    syncBoundaryRotSlider();
+  } else if (drag.type === 'b2') {
+    state.boundary.x2 = x;
+    state.boundary.y2 = y;
+    syncBoundaryRotSlider();
+  }
+  draw();
+});
+
+canvas.addEventListener('mouseup', () => { drag = null; });
+canvas.addEventListener('mouseleave', () => { drag = null; });
+
+/* 터치 지원 */
+canvas.addEventListener('touchstart', e => {
+  if (e.touches.length === 0) return;
+  const t = e.touches[0];
+  const evt = { clientX: t.clientX, clientY: t.clientY };
+  canvas.dispatchEvent(new MouseEvent('mousedown', evt));
+  e.preventDefault();
+}, { passive: false });
+canvas.addEventListener('touchmove', e => {
+  if (e.touches.length === 0) return;
+  const t = e.touches[0];
+  const evt = { clientX: t.clientX, clientY: t.clientY };
+  canvas.dispatchEvent(new MouseEvent('mousemove', evt));
+  e.preventDefault();
+}, { passive: false });
+canvas.addEventListener('touchend', e => {
+  canvas.dispatchEvent(new MouseEvent('mouseup', {}));
+  e.preventDefault();
+}, { passive: false });
+
+/* [2] getMouse adds panX so drag coords stay correct after panning */
+function getMouse(e) {
+  const rect = canvas.getBoundingClientRect();
+  return { x: e.clientX - rect.left + panX, y: e.clientY - rect.top };
+}
+
+/* ====================================================
+   스크롤바 이벤트
+   ==================================================== */
+let scrollDrag = null;
+
+document.getElementById('scrollbar-thumb').addEventListener('mousedown', e => {
+  e.preventDefault();
+  e.stopPropagation();
+  scrollDrag = { startX: e.clientX, startPan: panX };
+});
+
+document.getElementById('scrollbar-track').addEventListener('mousedown', e => {
+  if (e.target.id === 'scrollbar-thumb') return;
+  const rect = e.currentTarget.getBoundingClientRect();
+  const clickX = e.clientX - rect.left;
+  const trackWidth = rect.width;
+  const thumbEl = document.getElementById('scrollbar-thumb');
+  const thumbWidth = parseFloat(thumbEl.style.width) || Math.max(40, (W / LOGICAL_WIDTH) * trackWidth);
+  const maxLeft = trackWidth - thumbWidth;
+  const ratio = maxLeft > 0 ? clamp((clickX - thumbWidth / 2) / maxLeft, 0, 1) : 0;
+  panX = ratio * MAX_PAN;
+  updateScrollbar();
+  draw();
+});
+
+document.addEventListener('mousemove', e => {
+  if (!scrollDrag) return;
+  const track = document.getElementById('scrollbar-track');
+  const trackWidth = track.clientWidth;
+  const thumbEl = document.getElementById('scrollbar-thumb');
+  const thumbWidth = parseFloat(thumbEl.style.width) || Math.max(40, (W / LOGICAL_WIDTH) * trackWidth);
+  const pixelRange = trackWidth - thumbWidth;
+  const dx = e.clientX - scrollDrag.startX;
+  panX = clamp(scrollDrag.startPan + (pixelRange > 0 ? (dx / pixelRange) * MAX_PAN : 0), 0, MAX_PAN);
+  updateScrollbar();
+  draw();
+});
+
+document.addEventListener('mouseup', () => { scrollDrag = null; });
+
+/* ====================================================
+   슬라이더 ↔ 상태 동기화
+   ==================================================== */
+
+function syncAngleSliderFromLaser() {
+  const r = computeRays();
+  if (!r || !r.hits) return;
+  const g = getBoundaryGeom();
+  const projT = -r.ix * g.tx + -r.iy * g.ty;
+  const sign = projT >= 0 ? 1 : -1;
+  const deg = toDeg(r.thetaI) * sign;
+  document.getElementById('angleSlider').value = deg.toFixed(1);
+  document.getElementById('angleNum').value = deg.toFixed(1);
+  document.getElementById('angleVal').textContent = Math.abs(deg).toFixed(1) + '°';
+}
+
+function setLaserFromAngleSlider() {
+  const deg = parseFloat(document.getElementById('angleSlider').value);
+  document.getElementById('angleVal').textContent = Math.abs(deg).toFixed(1) + '°';
+  document.getElementById('angleNum').value = deg;
+  const r = computeRays();
+  let P;
+  if (r && r.hits) P = r.P;
+  else {
+    const g = getBoundaryGeom();
+    P = { x: (g.x1+g.x2)/2, y: (g.y1+g.y2)/2 };
+  }
+  const g = getBoundaryGeom();
+  const side = whichSide(state.laser.x, state.laser.y);
+  let nx = g.nx, ny = g.ny;
+  if (side === 'bot') { nx = -nx; ny = -ny; }
+  const th = toRad(deg);
+  const ux = Math.cos(th) * nx + Math.sin(th) * g.tx;
+  const uy = Math.cos(th) * ny + Math.sin(th) * g.ty;
+  const L = Math.hypot(state.laser.tipX - state.laser.x, state.laser.tipY - state.laser.y);
+  const Llen = Math.max(L, 200);
+  state.laser.x = P.x + ux * Llen;
+  state.laser.y = P.y + uy * Llen;
+  state.laser.tipX = P.x;
+  state.laser.tipY = P.y;
+  draw();
+}
+
+function syncBoundaryRotSlider() {
+  const g = getBoundaryGeom();
+  const deg = toDeg(Math.atan2(g.ty, g.tx));
+  let v = deg;
+  while (v > 90) v -= 180;
+  while (v < -90) v += 180;
+  const vClamped = clamp(Math.round(v), -45, 45);
+  document.getElementById('boundaryRot').value = vClamped;
+  document.getElementById('boundaryRotNum').value = vClamped;
+  document.getElementById('boundaryRotVal').textContent = vClamped + '°';
+}
+
+function applyBoundaryRotation(deg) {
+  const g = getBoundaryGeom();
+  const cx = (g.x1 + g.x2) / 2;
+  const cy = (g.y1 + g.y2) / 2;
+  const half = g.len / 2;
+  const th = toRad(deg);
+  const dx = Math.cos(th), dy = Math.sin(th);
+  state.boundary.x1 = cx - dx * half;
+  state.boundary.y1 = cy - dy * half;
+  state.boundary.x2 = cx + dx * half;
+  state.boundary.y2 = cy + dy * half;
+  document.getElementById('boundaryRotNum').value = deg;
+  document.getElementById('boundaryRotVal').textContent = deg + '°';
+  draw();
+}
+
+/* ====================================================
+   UI 이벤트 바인딩
+   ==================================================== */
+
+document.getElementById('laserColor').addEventListener('input', e => {
+  state.laserColor = e.target.value;
+  draw();
+});
+document.getElementById('laserWidth').addEventListener('input', e => {
+  state.laserWidth = parseFloat(e.target.value);
+  document.getElementById('laserWidthVal').textContent = e.target.value;
+  draw();
+});
+
+/* [3] angle slider + number input sync */
+document.getElementById('angleSlider').addEventListener('input', setLaserFromAngleSlider);
+
+document.getElementById('angleNum').addEventListener('input', e => {
+  const v = clamp(parseFloat(e.target.value) || 0, -89, 89);
+  document.getElementById('angleSlider').value = v;
+  setLaserFromAngleSlider();
+});
+document.getElementById('angleNum').addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const v = clamp(parseFloat(e.target.value) || 0, -89, 89);
+    e.target.value = v;
+    document.getElementById('angleSlider').value = v;
+    setLaserFromAngleSlider();
+  }
+});
+
+document.getElementById('mediumTop').addEventListener('change', e => {
+  if (e.target.value === 'custom') {
+    document.getElementById('customTopRow').style.display = 'flex';
+  } else {
+    document.getElementById('customTopRow').style.display = 'none';
+    state.n1 = parseFloat(e.target.value);
+    draw();
+  }
+});
+document.getElementById('mediumTopCustom').addEventListener('input', e => {
+  state.n1 = parseFloat(e.target.value);
+  draw();
+});
+document.getElementById('mediumBot').addEventListener('change', e => {
+  if (e.target.value === 'custom') {
+    document.getElementById('customBotRow').style.display = 'flex';
+  } else {
+    document.getElementById('customBotRow').style.display = 'none';
+    state.n2 = parseFloat(e.target.value);
+    draw();
+  }
+});
+document.getElementById('mediumBotCustom').addEventListener('input', e => {
+  state.n2 = parseFloat(e.target.value);
+  draw();
+});
+
+/* [3] boundary rotation slider + number input sync */
+document.getElementById('boundaryRot').addEventListener('input', e => {
+  const v = parseInt(e.target.value);
+  document.getElementById('boundaryRotNum').value = v;
+  applyBoundaryRotation(v);
+});
+
+document.getElementById('boundaryRotNum').addEventListener('input', e => {
+  const v = clamp(parseInt(e.target.value) || 0, -45, 45);
+  document.getElementById('boundaryRot').value = v;
+  applyBoundaryRotation(v);
+});
+document.getElementById('boundaryRotNum').addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const v = clamp(parseInt(e.target.value) || 0, -45, 45);
+    e.target.value = v;
+    document.getElementById('boundaryRot').value = v;
+    applyBoundaryRotation(v);
+  }
+});
+
+document.getElementById('showProtractor').addEventListener('change', e => {
+  state.show.protractor = e.target.checked; draw();
+});
+document.getElementById('protractorSize').addEventListener('input', e => {
+  state.protractorSize = parseInt(e.target.value);
+  document.getElementById('protractorSizeVal').textContent = e.target.value;
+  draw();
+});
+
+['showNormal','showRefracted','showReflected','showStraight','showIncidencePoint','showAngleArc'].forEach(id => {
+  document.getElementById(id).addEventListener('change', e => {
+    const key = id.replace('show','');
+    const k = key.charAt(0).toLowerCase() + key.slice(1);
+    state.show[k] = e.target.checked;
+    draw();
+  });
+});
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  state.laser = { x: 220, y: 140, tipX: 470, tipY: 320 };
+  state.boundary = { x1: 80, y1: 360, x2: 760, y2: 360 };
+  state.n1 = 1.00;
+  state.n2 = 1.33;
+  panX = 0;
+  document.getElementById('mediumTop').value = '1.00';
+  document.getElementById('mediumBot').value = '1.33';
+  document.getElementById('customTopRow').style.display = 'none';
+  document.getElementById('customBotRow').style.display = 'none';
+  document.getElementById('boundaryRot').value = 0;
+  document.getElementById('boundaryRotNum').value = 0;
+  document.getElementById('boundaryRotVal').textContent = '0°';
+  draw();
+  syncAngleSliderFromLaser();
+});
+
+document.getElementById('swapBtn').addEventListener('click', () => {
+  const tmp = state.n1; state.n1 = state.n2; state.n2 = tmp;
+  syncMediumSelects();
+  draw();
+});
+
+function syncMediumSelects() {
+  const setSel = (id, v) => {
+    const el = document.getElementById(id);
+    const opt = Array.from(el.options).find(o => parseFloat(o.value) === v);
+    if (opt) el.value = opt.value;
+    else { el.value = 'custom'; }
+  };
+  setSel('mediumTop', state.n1);
+  setSel('mediumBot', state.n2);
+  document.getElementById('customTopRow').style.display =
+    document.getElementById('mediumTop').value === 'custom' ? 'flex' : 'none';
+  document.getElementById('customBotRow').style.display =
+    document.getElementById('mediumBot').value === 'custom' ? 'flex' : 'none';
+  document.getElementById('mediumTopCustom').value = state.n1.toFixed(2);
+  document.getElementById('mediumBotCustom').value = state.n2.toFixed(2);
+}
+
+/* 초기화 */
+resize();
+syncAngleSliderFromLaser();
+</script>
+</body>
+</html>

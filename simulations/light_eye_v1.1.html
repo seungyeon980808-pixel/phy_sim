@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>근시·원시 눈 시뮬레이션</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;600&display=swap');
+:root {
+  --bg:#0b0f1a; --surface:#111827; --surface2:#1a2235; --surface3:#212d42;
+  --border:#2a3a55; --accent:#38bdf8; --green:#34d399; --yellow:#fbbf24;
+  --red:#f87171; --purple:#a78bfa; --text:#e2e8f0; --muted:#64748b;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Noto Sans KR',sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+
+/* Header */
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 20px;height:50px;display:flex;align-items:center;gap:14px;flex-shrink:0;}
+header h1{font-size:15px;font-weight:700;color:var(--accent);}
+header p{font-size:11px;color:var(--muted);}
+.eye-tabs{margin-left:auto;display:flex;gap:4px;}
+.eye-tab{background:var(--surface2);border:1px solid var(--border);color:var(--muted);font-size:12px;font-family:'Noto Sans KR',sans-serif;padding:5px 14px;border-radius:20px;cursor:pointer;transition:all .2s;}
+.eye-tab:hover{color:var(--text);}
+.eye-tab.normal.active{background:#059669;border-color:#059669;color:#fff;}
+.eye-tab.myopia.active{background:#7c3aed;border-color:#7c3aed;color:#fff;}
+.eye-tab.hyperopia.active{background:#b45309;border-color:#b45309;color:#fff;}
+
+/* Layout */
+main{flex:1;display:flex;overflow:hidden;}
+
+/* Panel */
+#panel{width:270px;min-width:270px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;}
+#panel::-webkit-scrollbar{width:3px;}
+#panel::-webkit-scrollbar-thumb{background:var(--border);}
+.psec{border-bottom:1px solid var(--border);padding:13px 15px;}
+.psec:last-child{border-bottom:none;}
+.stitle{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:11px;}
+.ctrl{margin-bottom:11px;}
+.ctrl .lr{display:flex;justify-content:space-between;margin-bottom:4px;}
+.ctrl .lbl{font-size:12px;color:var(--text);}
+.ctrl .val{font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--accent);font-weight:600;}
+input[type=range]{width:100%;height:4px;border-radius:2px;background:var(--surface3);outline:none;border:none;-webkit-appearance:none;cursor:pointer;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--accent);cursor:pointer;border:2px solid var(--bg);}
+.hint{font-size:10px;color:var(--muted);margin-top:3px;display:flex;justify-content:space-between;}
+
+/* Lens buttons */
+.lbtns{display:flex;gap:5px;margin-bottom:9px;}
+.lbtn{flex:1;padding:7px 3px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-size:11px;font-family:'Noto Sans KR',sans-serif;cursor:pointer;transition:all .15s;text-align:center;}
+.lbtn:hover{color:var(--text);}
+.lbtn.active.none{background:var(--surface3);border-color:var(--muted);color:var(--text);}
+.lbtn.active.convex{background:#1d4ed8;border-color:#3b82f6;color:#fff;}
+.lbtn.active.concave{background:#6d28d9;border-color:#8b5cf6;color:#fff;}
+
+/* Toggle */
+.trow{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;}
+.tlbl{font-size:12px;}
+.tog{width:36px;height:19px;background:var(--border);border-radius:10px;position:relative;cursor:pointer;border:none;transition:background .2s;flex-shrink:0;}
+.tog.on{background:var(--accent);}
+.tog::after{content:'';width:13px;height:13px;background:#fff;border-radius:50%;position:absolute;top:3px;left:3px;transition:left .2s;}
+.tog.on::after{left:20px;}
+
+/* Info */
+.irow{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(42,58,85,.5);font-size:11px;}
+.irow:last-child{border-bottom:none;}
+.ik{color:var(--muted);}
+.iv{font-family:'JetBrains Mono',monospace;color:var(--accent);font-weight:600;}
+
+/* Diagnosis */
+.diag{border-radius:8px;padding:10px 12px;font-size:11px;line-height:1.8;margin-top:4px;}
+.diag .dl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+.diag .ds{font-size:14px;font-weight:700;margin:2px 0 4px;}
+.diag.normal{background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.3);}
+.diag.normal .ds{color:var(--green);}
+.diag.myopia{background:rgba(139,92,246,.08);border:1px solid rgba(139,92,246,.3);}
+.diag.myopia .ds{color:var(--purple);}
+.diag.hyper{background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.3);}
+.diag.hyper .ds{color:var(--yellow);}
+
+/* Sim area */
+#simArea{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+#eyeWrap{flex:1;position:relative;overflow:hidden;min-height:0;}
+#eyeCanvas{display:block;width:100%;height:100%;}
+
+/* Vision */
+#visionPanel{height:190px;min-height:190px;border-top:1px solid var(--border);background:#000;display:flex;overflow:hidden;}
+.vhalf{flex:1;position:relative;overflow:hidden;}
+.vhalf+.vhalf{border-left:1px solid var(--border);}
+.vlabel{position:absolute;top:7px;left:10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.5);z-index:2;}
+#visCanvas,#corCanvas{width:100%;height:100%;display:block;}
+.vbadge{position:absolute;bottom:7px;right:8px;font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;z-index:2;}
+.vbadge.blurry{background:rgba(248,113,113,.2);color:var(--red);border:1px solid rgba(248,113,113,.4);}
+.vbadge.ok{background:rgba(52,211,153,.2);color:var(--green);border:1px solid rgba(52,211,153,.4);}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>👁 근시·원시 눈 시뮬레이션</h1>
+    <p>중학교 2학년 과학 | 빛의 굴절과 눈의 구조</p>
+  </div>
+  <div class="eye-tabs">
+    <button class="eye-tab normal active" onclick="setPreset('normal')">정상안</button>
+    <button class="eye-tab myopia"        onclick="setPreset('myopia')">근시안</button>
+    <button class="eye-tab hyperopia"     onclick="setPreset('hyperopia')">원시안</button>
+  </div>
+</header>
+
+<main>
+<div id="panel">
+  <div class="psec">
+    <div class="stitle">👁 안구 조건</div>
+    <div class="ctrl">
+      <div class="lr"><span class="lbl">안구 길이</span><span class="val" id="vEyeLen">24.0 mm</span></div>
+      <input type="range" id="sEyeLen" min="18" max="30" step="0.1" value="24" oninput="onSL(this,'eyeLen','vEyeLen',' mm')">
+      <div class="hint"><span>짧음(원시)</span><span>정상 24mm</span><span>길음(근시)</span></div>
+    </div>
+    <div class="ctrl">
+      <div class="lr"><span class="lbl">수정체 굴절력</span><span class="val" id="vLensPow">18.0 D</span></div>
+      <input type="range" id="sLensPow" min="8" max="28" step="0.1" value="18" oninput="onSL(this,'lensPow','vLensPow',' D')">
+      <div class="hint"><span>납작(원시)</span><span>정상 18D</span><span>볼록(근시)</span></div>
+    </div>
+    <div class="ctrl">
+      <div class="lr"><span class="lbl">물체 거리</span><span class="val" id="vObjDist">5.0 m</span></div>
+      <input type="range" id="sObjDist" min="0.25" max="10" step="0.05" value="5" oninput="onSL(this,'objDist','vObjDist',' m')">
+      <div class="hint"><span>가까이 0.25m</span><span>멀리 10m</span></div>
+    </div>
+  </div>
+
+  <div class="psec">
+    <div class="stitle">🔵 교정 렌즈</div>
+    <div class="lbtns">
+      <button class="lbtn none active" id="btnNone"    onclick="setLens('none')">없음</button>
+      <button class="lbtn convex"      id="btnConvex"  onclick="setLens('convex')">볼록렌즈</button>
+      <button class="lbtn concave"     id="btnConcave" onclick="setLens('concave')">오목렌즈</button>
+    </div>
+    <div id="lensCtrl" style="display:none">
+      <div class="ctrl">
+        <div class="lr"><span class="lbl">렌즈 두께(굴절력)</span><span class="val" id="vLensD">3.0 D</span></div>
+        <input type="range" id="sLensD" min="0.5" max="14" step="0.1" value="3" oninput="onSL(this,'lensD','vLensD',' D')">
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--muted);line-height:1.6">두께가 두꺼울수록 굴절력이 강해집니다.</div>
+  </div>
+
+  <div class="psec">
+    <div class="stitle">🎛 표시 옵션</div>
+    <div class="trow"><span class="tlbl">내부 구조</span><button class="tog on" id="togAnatomy" onclick="tog('anatomy')"></button></div>
+    <div class="trow"><span class="tlbl">광선 경로</span><button class="tog on" id="togRays"    onclick="tog('rays')"></button></div>
+    <div class="trow"><span class="tlbl">초점 위치</span><button class="tog on" id="togFocal"   onclick="tog('focal')"></button></div>
+  </div>
+
+  <div class="psec">
+    <div class="stitle">📊 광학 데이터</div>
+    <div class="irow"><span class="ik">안구 길이</span><span class="iv" id="dEL">24.0 mm</span></div>
+    <div class="irow"><span class="ik">수정체 굴절력</span><span class="iv" id="dLP">18.0 D</span></div>
+    <div class="irow"><span class="ik">각막 굴절력</span><span class="iv">43.0 D</span></div>
+    <div class="irow"><span class="ik">총 굴절력</span><span class="iv" id="dTP">—</span></div>
+    <div class="irow"><span class="ik">상 맺힘 위치</span><span class="iv" id="dIP">—</span></div>
+    <div class="irow"><span class="ik">망막까지 거리</span><span class="iv" id="dRP">—</span></div>
+    <div class="irow"><span class="ik">오차</span><span class="iv" id="dER">—</span></div>
+  </div>
+
+  <div class="psec">
+    <div class="stitle">🔬 진단</div>
+    <div class="diag normal" id="diagBox">
+      <div class="dl">눈 상태</div>
+      <div class="ds" id="diagS">정상안</div>
+      <div id="diagD">망막 위에 정확히 초점이 맺힙니다.</div>
+    </div>
+  </div>
+</div>
+
+<div id="simArea">
+  <div id="eyeWrap"><canvas id="eyeCanvas"></canvas></div>
+  <div id="visionPanel">
+    <div class="vhalf">
+      <div class="vlabel">현재 시야 (교정 전)</div>
+      <canvas id="visCanvas"></canvas>
+      <div class="vbadge blurry" id="badge1">흐림</div>
+    </div>
+    <div class="vhalf">
+      <div class="vlabel">교정 후 시야</div>
+      <canvas id="corCanvas"></canvas>
+      <div class="vbadge ok" id="badge2">선명</div>
+    </div>
+  </div>
+</div>
+</main>
+
+<script>
+// ── State ──────────────────────────────────────────────────
+const S = {
+  eyeLen: 24, lensPow: 18, objDist: 5,
+  lens: 'none', lensD: 3,
+  show: { anatomy:true, rays:true, focal:true }
+};
+const CORNEA = 43;   // D fixed
+const N_EYE  = 1.336;
+
+// ── Physics ────────────────────────────────────────────────
+function calcOptics(overrideLens) {
+  const lens = overrideLens !== undefined ? overrideLens : S.lens;
+  let corrP = 0;
+  if (lens === 'convex')  corrP =  S.lensD;
+  if (lens === 'concave') corrP = -S.lensD;
+  const Ptotal = CORNEA + S.lensPow + corrP;
+  const u = -S.objDist;                    // real object → negative
+  const inv_v = Ptotal + (1/u);
+  const v = Math.abs(inv_v) > 1e-9 ? 1/inv_v : 1e9;   // m
+  const v_ret = (S.eyeLen / 1000) / N_EYE; // optical path to retina (m)
+  const err = v - v_ret;                   // + = behind retina (원시), − = before (근시)
+  return { Ptotal, corrP, v, v_ret, err };
+}
+
+function blurFromErr(err) {
+  return Math.min(Math.abs(err) * 1400, 30);
+}
+
+// ── Canvases ───────────────────────────────────────────────
+const eyeC = document.getElementById('eyeCanvas');  const ec = eyeC.getContext('2d');
+const visC = document.getElementById('visCanvas');   const vc = visC.getContext('2d');
+const corC = document.getElementById('corCanvas');   const cc = corC.getContext('2d');
+
+function resize() {
+  const ew = document.getElementById('eyeWrap');
+  eyeC.width = ew.clientWidth; eyeC.height = ew.clientHeight;
+  const vp = document.getElementById('visionPanel');
+  const vw = Math.floor(vp.clientWidth/2), vh = vp.clientHeight;
+  visC.width = corC.width = vw; visC.height = corC.height = vh;
+  render();
+}
+window.addEventListener('resize', resize);
+
+// ── Main render ────────────────────────────────────────────
+function render() {
+  const opt = calcOptics();
+  drawEye(opt);
+  const optNone = calcOptics('none');  // what uncorrected eye sees
+  drawVision(vc, blurFromErr(optNone.err), 'badge1');
+  drawVision(cc, blurFromErr(opt.err),    'badge2');
+  updatePanel(opt, optNone);
+}
+
+// ══════════════════════════════════════════════════════════
+//  EYE DRAWING
+// ══════════════════════════════════════════════════════════
+function drawEye(opt) {
+  const W = eyeC.width, H = eyeC.height;
+  ec.clearRect(0,0,W,H);
+
+  // dark background
+  const bg = ec.createLinearGradient(0,0,W,H);
+  bg.addColorStop(0,'#0b0f1a'); bg.addColorStop(1,'#0d1220');
+  ec.fillStyle = bg; ec.fillRect(0,0,W,H);
+
+  // ── Geometry ──────────────────────────────────────────
+  const cy = H * 0.5;
+  // Eye horizontal radius scales with eyeLen
+  const baseW = Math.min(W * 0.38, 280);
+  const baseH = Math.min(H * 0.52, 200);
+  const scale = S.eyeLen / 24;
+  const eW = baseW * Math.max(0.8, Math.min(scale, 1.2));
+  const eH = baseH;
+
+  // Center of eyeball slightly right of canvas center
+  const ox = W * 0.52;
+
+  const retinaX  = ox + eW;           // retina back wall
+  const corneaX  = ox - eW;           // cornea front
+  const lensX    = ox - eW * 0.58;    // crystalline lens center
+  const pupilX   = ox - eW * 0.72;    // pupil plane
+  const glassX   = ox - eW * 1.18;    // corrective lens
+
+  // ── Sclera ──
+  if (S.show.anatomy) {
+    ec.save();
+    // Fill
+    ec.beginPath(); ec.ellipse(ox, cy, eW, eH, 0, 0, Math.PI*2);
+    const sg = ec.createRadialGradient(ox-eW*0.2, cy-eH*0.2, 0, ox, cy, eW*1.1);
+    sg.addColorStop(0,'rgba(240,248,255,0.07)'); sg.addColorStop(1,'rgba(200,230,255,0.02)');
+    ec.fillStyle = sg; ec.fill();
+    // Outline
+    ec.strokeStyle = 'rgba(167,243,208,0.4)'; ec.lineWidth = 2; ec.stroke();
+    ec.restore();
+
+    // Choroid (thin dark ring inside sclera)
+    ec.save();
+    ec.beginPath(); ec.ellipse(ox, cy, eW*0.95, eH*0.95, 0, 0, Math.PI*2);
+    ec.strokeStyle = 'rgba(88,28,135,0.35)'; ec.lineWidth = 5; ec.stroke();
+    ec.restore();
+
+    // Retina arc
+    ec.save();
+    ec.beginPath();
+    ec.arc(retinaX - eW*0.32, cy, eW*0.38, -Math.PI*0.52, Math.PI*0.52);
+    ec.strokeStyle = '#fca5a5'; ec.lineWidth = 3;
+    ec.shadowColor = '#fca5a5'; ec.shadowBlur = 8; ec.stroke();
+    ec.restore();
+    label(ec, '망막', retinaX-12, cy - eH*0.42, 'rgba(252,165,165,0.85)');
+
+    // Optic nerve
+    ec.save();
+    ec.beginPath();
+    ec.moveTo(retinaX+2, cy+eH*0.08); ec.lineTo(retinaX+22, cy+eH*0.13);
+    ec.strokeStyle='rgba(250,204,21,0.55)'; ec.lineWidth=5; ec.stroke();
+    ec.restore();
+    label(ec,'시신경',retinaX+18,cy+eH*0.18,'rgba(250,204,21,0.7)');
+
+    // Vitreous label
+    label(ec,'유리체',ox+eW*0.12,cy+eH*0.55,'rgba(56,189,248,0.3)');
+
+    // Aqueous
+    label(ec,'방수',(corneaX+lensX)/2-8,cy+eH*0.45,'rgba(103,232,249,0.3)');
+
+    // Cornea arc
+    ec.save();
+    ec.beginPath();
+    ec.arc(corneaX+eW*0.13, cy, eW*0.17, -Math.PI*0.58, Math.PI*0.58);
+    ec.strokeStyle='rgba(103,232,249,0.85)'; ec.lineWidth=2.5;
+    ec.shadowColor='#67e8f9'; ec.shadowBlur=10; ec.stroke();
+    ec.restore();
+    label(ec,'각막',corneaX-8,cy-eH*0.4,'rgba(103,232,249,0.85)');
+
+    // Iris / Pupil
+    ec.save();
+    ec.strokeStyle='rgba(134,239,172,0.3)'; ec.lineWidth=10;
+    ec.beginPath(); ec.moveTo(pupilX,cy-eH*0.3); ec.lineTo(pupilX,cy+eH*0.3); ec.stroke();
+    ec.strokeStyle='#0b0f1a'; ec.lineWidth=11;
+    ec.beginPath(); ec.moveTo(pupilX,cy-eH*0.1); ec.lineTo(pupilX,cy+eH*0.1); ec.stroke();
+    ec.restore();
+    label(ec,'홍채/동공',pupilX-30,cy+eH*0.42,'rgba(134,239,172,0.6)');
+
+    // Crystalline lens — thickness varies with lensPow
+    const lThick = 6 + (S.lensPow - 8) * 1.55;
+    ec.save();
+    ec.beginPath();
+    ec.moveTo(lensX, cy-eH*0.23);
+    ec.quadraticCurveTo(lensX-lThick, cy, lensX, cy+eH*0.23);
+    ec.quadraticCurveTo(lensX+lThick, cy, lensX, cy-eH*0.23);
+    const lg = ec.createRadialGradient(lensX,cy,0,lensX,cy,lThick+6);
+    lg.addColorStop(0,'rgba(147,197,253,0.5)'); lg.addColorStop(1,'rgba(147,197,253,0.08)');
+    ec.fillStyle=lg; ec.fill();
+    ec.strokeStyle='#93c5fd'; ec.lineWidth=2;
+    ec.shadowColor='#93c5fd'; ec.shadowBlur=8; ec.stroke();
+    ec.restore();
+    label(ec,'수정체',lensX-18,cy-eH*0.32,'rgba(147,197,253,0.9)');
+
+    // Axis
+    ec.save();
+    ec.strokeStyle='rgba(255,255,255,0.07)'; ec.lineWidth=1; ec.setLineDash([4,6]);
+    ec.beginPath(); ec.moveTo(W*0.04,cy); ec.lineTo(retinaX+10,cy); ec.stroke();
+    ec.setLineDash([]); ec.restore();
+
+    // n labels
+    ec.save();
+    ec.font='10px JetBrains Mono';
+    ec.fillStyle='rgba(100,116,139,0.7)'; ec.fillText('n = 1.00 (공기)', W*0.04, H*0.1);
+    ec.fillStyle='rgba(56,189,248,0.6)'; ec.fillText('n = 1.336 (안구)', ox+10, H*0.1);
+    ec.restore();
+  }
+
+  // ── Corrective lens ──
+  if (S.lens !== 'none') {
+    const tpx = S.lensD * 2.0;
+    const lh = eH * 0.72;
+    ec.save();
+    if (S.lens === 'convex') {
+      ec.beginPath();
+      ec.moveTo(glassX, cy-lh/2);
+      ec.quadraticCurveTo(glassX-tpx, cy, glassX, cy+lh/2);
+      ec.quadraticCurveTo(glassX+tpx, cy, glassX, cy-lh/2);
+      ec.fillStyle='rgba(251,191,36,0.1)'; ec.fill();
+      ec.strokeStyle='#fbbf24'; ec.lineWidth=2.5;
+      ec.shadowColor='#fbbf24'; ec.shadowBlur=10; ec.stroke();
+      ec.fillStyle='#fbbf24'; ec.font='bold 11px Noto Sans KR'; ec.textAlign='center';
+      ec.fillText('볼록렌즈',glassX,cy-lh/2-10);
+      ec.font='10px JetBrains Mono';
+      ec.fillText('+'+S.lensD.toFixed(1)+'D',glassX,cy+lh/2+16);
+    } else {
+      ec.beginPath();
+      ec.moveTo(glassX-tpx, cy-lh/2);
+      ec.lineTo(glassX+tpx, cy-lh/2);
+      ec.quadraticCurveTo(glassX, cy, glassX+tpx, cy+lh/2);
+      ec.lineTo(glassX-tpx, cy+lh/2);
+      ec.quadraticCurveTo(glassX, cy, glassX-tpx, cy-lh/2);
+      ec.fillStyle='rgba(167,139,250,0.1)'; ec.fill();
+      ec.strokeStyle='#a78bfa'; ec.lineWidth=2.5;
+      ec.shadowColor='#a78bfa'; ec.shadowBlur=10; ec.stroke();
+      ec.fillStyle='#a78bfa'; ec.font='bold 11px Noto Sans KR'; ec.textAlign='center';
+      ec.fillText('오목렌즈',glassX,cy-lh/2-10);
+      ec.font='10px JetBrains Mono';
+      ec.fillText('-'+S.lensD.toFixed(1)+'D',glassX,cy+lh/2+16);
+    }
+    ec.restore();
+  }
+
+  // ── RAYS ──────────────────────────────────────────────
+  if (S.show.rays) {
+    // We use the thin-lens model:
+    // The combined system refracts rays at a single plane (pupilX).
+    // For object at distance u (m), combined power P (D):
+    //   image distance v (m) = 1/(P - 1/|u|)
+    // We map v onto canvas: focal px = corneaX + v/v_ret * eW
+    // Rays converge (or diverge if v<0) at that point.
+    const { Ptotal, v, v_ret } = opt;
+
+    // 3 rays: top, center, bottom entering pupil
+    const rayEntries = [
+      { py: cy - eH*0.18, color:'rgba(56,189,248,0.85)' },
+      { py: cy,            color:'rgba(103,232,249,0.9)' },
+      { py: cy + eH*0.18, color:'rgba(147,197,253,0.8)' },
+    ];
+
+    // Focal point canvas position
+    // corneaX → retinaX = 2*eW pixels  (retinaX = ox+eW, corneaX = ox-eW)
+    // So: when v == v_ret → focalPx == retinaX ✓
+    const focalPx = corneaX + (v / v_ret) * 2 * eW;
+
+    for (const ray of rayEntries) {
+      drawRay(ec, ray, S.lens, glassX, corneaX, pupilX, lensX, retinaX, cy, eW, eH, focalPx, v, v_ret);
+    }
+  }
+
+  // ── Focal dot ──
+  if (S.show.focal) {
+    const { v, v_ret } = opt;
+    const focalPx = corneaX + (v / v_ret) * 2 * eW;
+    const onRetina = Math.abs(v - v_ret) < 0.002;
+    const col = onRetina ? '#34d399' : (v < v_ret ? '#f87171' : '#fbbf24');
+    const lbl = onRetina ? '초점 ✓ 망막' : (v < v_ret ? '초점 (망막 앞)' : '초점 (망막 뒤)');
+
+    if (focalPx > corneaX - 60 && focalPx < W + 20) {
+      ec.save();
+      ec.fillStyle = col; ec.shadowColor = col; ec.shadowBlur = 14;
+      ec.beginPath(); ec.arc(focalPx, cy, 5.5, 0, Math.PI*2); ec.fill();
+      ec.shadowBlur=0;
+      ec.strokeStyle=col; ec.lineWidth=1; ec.setLineDash([3,4]); ec.globalAlpha=0.5;
+      ec.beginPath(); ec.moveTo(focalPx,cy-22); ec.lineTo(focalPx,cy+22); ec.stroke();
+      ec.setLineDash([]); ec.globalAlpha=1;
+      ec.font='bold 11px Noto Sans KR'; ec.fillStyle=col; ec.textAlign='left';
+      ec.fillText(lbl, focalPx+9, cy-10);
+      ec.restore();
+    }
+  }
+}
+
+// ── Draw a single ray with correct convergence ──────────────
+function drawRay(ctx, ray, lens, glassX, corneaX, pupilX, lensX, retinaX, cy, eW, eH, focalPx, v, v_ret) {
+  // The ray converges to focalPx on the optical axis (cy).
+  // BEFORE cornea: rays come from far left, parallel (object at infinity ≈ no angle change visible)
+  // or slightly converging/diverging based on object distance.
+  // For clarity (middle school level): draw rays PARALLEL coming in from left, then converge after lens system.
+
+  ctx.save();
+  ctx.strokeStyle = ray.color;
+  ctx.lineWidth = 1.6;
+  ctx.shadowColor = ray.color;
+  ctx.shadowBlur = 4;
+  ctx.lineCap = 'round';
+
+  const startX = corneaX - eW * 1.05;
+  const entryY = ray.py;
+
+  // ── Segment 1: free space → glass lens (if any) ──
+  if (lens !== 'none') {
+    // Slight refraction at corrective lens
+    const corrP = lens === 'convex' ? S.lensD : -S.lensD;
+    const h = entryY - cy;
+    // angle change from thin lens: Δα = -h * P (in diopter units, scaled)
+    const dAlpha = -h * corrP * 0.0003;
+
+    // After glass, ray travels to cornea
+    const corneaEntryY = entryY + dAlpha * (corneaX - glassX);
+
+    ctx.beginPath();
+    ctx.moveTo(startX, entryY);
+    ctx.lineTo(glassX, entryY);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(glassX, entryY);
+    ctx.lineTo(corneaX, corneaEntryY);
+    ctx.stroke();
+
+    // ── Segment 2: inside eye → focal point (or retina) ──
+    // After all optics (cornea + lens), the ray converges to focalPx
+    // We model: from corneaX at corneaEntryY, straight line to focalPx,cy
+    // then continues beyond if focal is before retina
+    const endX = Math.min(focalPx, retinaX + eW*0.4);
+    if (Math.abs(focalPx - corneaX) > 1) {
+      const slope = (cy - corneaEntryY) / (focalPx - corneaX);
+      const endY = corneaEntryY + slope * (endX - corneaX);
+
+      ctx.beginPath();
+      ctx.moveTo(corneaX, corneaEntryY);
+      ctx.lineTo(endX, clamp(endY, cy-eH, cy+eH));
+      ctx.stroke();
+
+      // If focal is BEFORE retina (근시): ray diverges after focal point
+      // direction away from axis, same side as original entry height
+      if (focalPx < retinaX) {
+        ctx.globalAlpha = 0.32;
+        // After converging to focal point, ray spreads back out
+        // The spread direction mirrors the incoming angle (symmetric about axis)
+        const divSlope = (cy - corneaEntryY) / (focalPx - corneaX); // same as convergence slope
+        const divEndY = cy - divSlope * (retinaX - focalPx);          // flipped: diverge away
+        ctx.beginPath();
+        ctx.moveTo(focalPx, cy);
+        ctx.lineTo(retinaX, clamp(divEndY, cy-eH, cy+eH));
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+    }
+  } else {
+    // No corrective lens
+    // Segment 1: straight from startX to corneaX at same height
+    ctx.beginPath();
+    ctx.moveTo(startX, entryY);
+    ctx.lineTo(corneaX, entryY);
+    ctx.stroke();
+
+    // Segment 2: converge toward focalPx
+    const endX = Math.min(focalPx, retinaX + eW*0.4);
+    if (Math.abs(focalPx - corneaX) > 1) {
+      const slope = (cy - entryY) / (focalPx - corneaX);
+      const endY = entryY + slope * (endX - corneaX);
+
+      ctx.beginPath();
+      ctx.moveTo(corneaX, entryY);
+      ctx.lineTo(endX, clamp(endY, cy-eH, cy+eH));
+      ctx.stroke();
+
+      // Diverge after focal if focal is before retina (근시)
+      if (focalPx < retinaX) {
+        ctx.globalAlpha = 0.32;
+        const divSlope = (cy - entryY) / (focalPx - corneaX); // same as convergence
+        const divEndY = cy - divSlope * (retinaX - focalPx);   // flipped: diverge away
+        ctx.beginPath();
+        ctx.moveTo(focalPx, cy);
+        ctx.lineTo(retinaX, clamp(divEndY, cy-eH, cy+eH));
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+    }
+  }
+
+  ctx.restore();
+}
+
+function clamp(v,lo,hi){return Math.max(lo,Math.min(hi,v));}
+function label(ctx,txt,x,y,col){ctx.save();ctx.fillStyle=col;ctx.font='11px Noto Sans KR';ctx.fillText(txt,x,y);ctx.restore();}
+
+// ══════════════════════════════════════════════════════════
+//  VISION CANVAS — 야외 간판 읽기 장면
+// ══════════════════════════════════════════════════════════
+function drawVision(ctx, blurPx, badgeId) {
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+
+  // Offscreen render
+  const off = document.createElement('canvas');
+  off.width = W; off.height = H;
+  const oc = off.getContext('2d');
+
+  // Sky
+  const sky = oc.createLinearGradient(0,0,0,H*0.58);
+  sky.addColorStop(0,'#1e3a5f'); sky.addColorStop(1,'#2d5f8a');
+  oc.fillStyle=sky; oc.fillRect(0,0,W,H*0.58);
+
+  // Clouds
+  drawCloud(oc, W*0.18, H*0.12, 38);
+  drawCloud(oc, W*0.65, H*0.08, 28);
+  drawCloud(oc, W*0.82, H*0.18, 22);
+
+  // Ground / road
+  const gnd = oc.createLinearGradient(0,H*0.58,0,H);
+  gnd.addColorStop(0,'#374151'); gnd.addColorStop(1,'#1f2937');
+  oc.fillStyle=gnd; oc.fillRect(0,H*0.58,W,H*0.42);
+
+  // Road lane marks
+  oc.fillStyle='rgba(255,255,255,0.25)';
+  oc.fillRect(W*0.49, H*0.62, W*0.02, H*0.06);
+  oc.fillRect(W*0.49, H*0.72, W*0.02, H*0.06);
+  oc.fillRect(W*0.49, H*0.84, W*0.02, H*0.1);
+
+  // Sidewalk
+  oc.fillStyle='#4b5563'; oc.fillRect(0,H*0.58,W*0.18,H*0.42);
+  oc.fillStyle='#374151'; oc.fillRect(W*0.82,H*0.58,W*0.18,H*0.42);
+
+  // Buildings background
+  drawBuilding(oc, W*0.04, H*0.18, W*0.12, H*0.4, '#1f2937', '#111827');
+  drawBuilding(oc, W*0.78, H*0.22, W*0.1, H*0.36, '#1f2937', '#111827');
+  drawBuilding(oc, W*0.86, H*0.15, W*0.14, H*0.43, '#1a2030', '#111827');
+
+  // Main building (store)
+  drawBuilding(oc, W*0.22, H*0.16, W*0.56, H*0.42, '#243447', '#1a2a3a');
+
+  // Store awning
+  oc.fillStyle='#dc2626';
+  oc.fillRect(W*0.22, H*0.33, W*0.56, H*0.06);
+  // Awning stripes
+  oc.fillStyle='rgba(255,255,255,0.15)';
+  for(let i=0;i<8;i++) oc.fillRect(W*0.22+i*W*0.07, H*0.33, W*0.035, H*0.06);
+
+  // ★ Main sign board ──────────────────────────────────────
+  const signX = W*0.26, signY = H*0.19, signW = W*0.48, signH = H*0.13;
+  // Sign bg
+  oc.fillStyle='#0f172a';
+  oc.fillRect(signX, signY, signW, signH);
+  oc.strokeStyle='#fbbf24'; oc.lineWidth=3;
+  oc.strokeRect(signX, signY, signW, signH);
+
+  // Sign text - this is what blurs with myopia/hyperopia
+  oc.fillStyle='#fde68a';
+  oc.textAlign='center'; oc.textBaseline='middle';
+  const bigFont = Math.max(10, Math.round(signH*0.48));
+  oc.font=`bold ${bigFont}px Noto Sans KR`;
+  oc.fillText('안경원', signX+signW*0.5, signY+signH*0.38);
+  const smallFont = Math.max(7, Math.round(signH*0.26));
+  oc.font=`${smallFont}px Noto Sans KR`;
+  oc.fillStyle='#93c5fd';
+  oc.fillText('시력 교정 전문  📞 02-123-4567', signX+signW*0.5, signY+signH*0.75);
+
+  // Secondary sign (bus stop)
+  const bs_x=W*0.05, bs_y=H*0.37, bs_w=W*0.11, bs_h=H*0.18;
+  oc.fillStyle='#1e40af'; oc.fillRect(bs_x,bs_y,bs_w,bs_h);
+  oc.strokeStyle='#60a5fa'; oc.lineWidth=2; oc.strokeRect(bs_x,bs_y,bs_w,bs_h);
+  oc.fillStyle='#fff'; oc.textAlign='center'; oc.textBaseline='middle';
+  oc.font=`bold ${Math.round(bs_h*0.22)}px Noto Sans KR`;
+  oc.fillText('버스정류장', bs_x+bs_w/2, bs_y+bs_h*0.3);
+  oc.font=`${Math.round(bs_h*0.17)}px Noto Sans KR`;
+  oc.fillStyle='#93c5fd';
+  oc.fillText('103번', bs_x+bs_w/2, bs_y+bs_h*0.55);
+  oc.fillText('240번', bs_x+bs_w/2, bs_y+bs_h*0.75);
+
+  // Traffic light
+  const tl_x=W*0.73, tl_y=H*0.28;
+  oc.fillStyle='#111827'; oc.fillRect(tl_x,tl_y,W*0.04,H*0.22);
+  oc.fillStyle='#374151'; oc.fillRect(tl_x-W*0.005,tl_y-H*0.01,W*0.05,H*0.17);
+  oc.beginPath(); oc.arc(tl_x+W*0.02,tl_y+H*0.03,W*0.013,0,Math.PI*2);
+  oc.fillStyle='#ef4444'; oc.fill();
+  oc.beginPath(); oc.arc(tl_x+W*0.02,tl_y+H*0.08,W*0.013,0,Math.PI*2);
+  oc.fillStyle='#374151'; oc.fill();
+  oc.beginPath(); oc.arc(tl_x+W*0.02,tl_y+H*0.13,W*0.013,0,Math.PI*2);
+  oc.fillStyle='#374151'; oc.fill();
+
+  // People silhouettes
+  drawPerson(oc, W*0.15, H*0.56);
+  drawPerson(oc, W*0.35, H*0.56);
+
+  // Apply blur
+  ctx.clearRect(0,0,W,H);
+  if (blurPx > 0.4) ctx.filter = `blur(${blurPx.toFixed(1)}px)`;
+  ctx.drawImage(off, 0, 0);
+  ctx.filter = 'none';
+
+  // Dark overlay when blurry
+  const alpha = Math.min(blurPx/32, 0.45);
+  ctx.fillStyle = `rgba(10,14,26,${alpha})`;
+  ctx.fillRect(0,0,W,H);
+
+  // Badge
+  const bd = document.getElementById(badgeId);
+  if (blurPx < 2) {
+    bd.textContent = '선명 ✓'; bd.className = 'vbadge ok';
+  } else {
+    bd.textContent = `흐림 (blur ${blurPx.toFixed(1)}px)`; bd.className = 'vbadge blurry';
+  }
+}
+
+function drawCloud(ctx, x, y, r) {
+  ctx.save(); ctx.fillStyle='rgba(255,255,255,0.18)';
+  ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x+r*0.8,y+r*0.2,r*0.7,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x-r*0.7,y+r*0.2,r*0.6,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+function drawBuilding(ctx, x, y, w, h, wall, win) {
+  ctx.fillStyle=wall; ctx.fillRect(x,y,w,h);
+  ctx.fillStyle=win;
+  const cols=3, rows=4;
+  const pw=w/cols*0.5, ph=h/rows*0.35;
+  for(let r=0;r<rows;r++) for(let c=0;c<cols;c++) {
+    ctx.fillRect(x+c*(w/cols)+w*0.06, y+r*(h/rows)+h*0.06, pw, ph);
+  }
+}
+function drawPerson(ctx, x, y) {
+  ctx.save(); ctx.fillStyle='rgba(31,41,55,0.9)';
+  ctx.beginPath(); ctx.arc(x,y-14,7,0,Math.PI*2); ctx.fill();
+  ctx.fillRect(x-5,y-7,10,18); ctx.restore();
+}
+
+// ══════════════════════════════════════════════════════════
+//  Panel update
+// ══════════════════════════════════════════════════════════
+function updatePanel(opt, optBase) {
+  const {Ptotal, v, v_ret, err} = opt;
+  const errMm = err*1000;
+  document.getElementById('dEL').textContent = S.eyeLen.toFixed(1)+' mm';
+  document.getElementById('dLP').textContent = S.lensPow.toFixed(1)+' D';
+  document.getElementById('dTP').textContent = Ptotal.toFixed(1)+' D';
+  document.getElementById('dIP').textContent = isFinite(v)?(v*1000).toFixed(2)+' mm':'∞';
+  document.getElementById('dRP').textContent = (v_ret*1000).toFixed(2)+' mm';
+  document.getElementById('dER').textContent = (errMm>=0?'+':'')+errMm.toFixed(2)+' mm';
+
+  // Base diagnosis (without correction)
+  const baseErr = optBase.err*1000;
+  let cls,st,ds;
+  if(Math.abs(baseErr)<0.6){
+    cls='normal'; st='정상안 (正常眼)'; ds='망막 위에 정확히 초점이 맺힙니다.';
+  } else if(baseErr<0){
+    cls='myopia'; st='근시안 (近視眼)';
+    ds=`초점이 망막 앞 ${Math.abs(baseErr).toFixed(1)}mm에 맺힙니다.\n→ 오목렌즈로 교정하세요.`;
+  } else {
+    cls='hyper'; st='원시안 (遠視眼)';
+    ds=`초점이 망막 뒤 ${baseErr.toFixed(1)}mm에 맺힙니다.\n→ 볼록렌즈로 교정하세요.`;
+  }
+  document.getElementById('diagBox').className='diag '+cls;
+  document.getElementById('diagS').textContent=st;
+  document.getElementById('diagD').textContent=ds;
+}
+
+// ══════════════════════════════════════════════════════════
+//  Controls
+// ══════════════════════════════════════════════════════════
+function onSL(el, key, vid, unit) {
+  S[key] = parseFloat(el.value);
+  document.getElementById(vid).textContent = S[key].toFixed(1)+unit;
+  render();
+}
+function setLens(type) {
+  S.lens=type;
+  ['btnNone','btnConvex','btnConcave'].forEach(id=>document.getElementById(id).classList.remove('active'));
+  document.getElementById(type==='none'?'btnNone':type==='convex'?'btnConvex':'btnConcave').classList.add('active');
+  document.getElementById('lensCtrl').style.display = type==='none'?'none':'block';
+  render();
+}
+function tog(key) {
+  S.show[key]=!S.show[key];
+  document.getElementById('tog'+key.charAt(0).toUpperCase()+key.slice(1)).classList.toggle('on',S.show[key]);
+  render();
+}
+function setPreset(p) {
+  document.querySelectorAll('.eye-tab').forEach(b=>b.classList.remove('active'));
+  document.querySelector('.eye-tab.'+p).classList.add('active');
+  if(p==='normal')    { S.eyeLen=24; S.lensPow=18; }
+  else if(p==='myopia')    { S.eyeLen=27; S.lensPow=22; }
+  else                { S.eyeLen=20; S.lensPow=14; }
+  S.objDist=5; S.lens='none';
+  document.getElementById('sEyeLen').value=S.eyeLen;
+  document.getElementById('sLensPow').value=S.lensPow;
+  document.getElementById('sObjDist').value=5;
+  document.getElementById('vEyeLen').textContent=S.eyeLen.toFixed(1)+' mm';
+  document.getElementById('vLensPow').textContent=S.lensPow.toFixed(1)+' D';
+  document.getElementById('vObjDist').textContent='5.0 m';
+  setLens('none');
+}
+
+resize();
+</script>
+</body>
+</html>

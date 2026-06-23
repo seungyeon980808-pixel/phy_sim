@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>굴절 비유 — 수상 구조에서 빛으로</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ===== HEADER ===== -->
+  <header class="topbar">
+    <a class="hub-link" href="../sim_hub/index.html">← 허브</a>
+    <h1 id="page-title">수상 구조원의 최단 시간 경로</h1>
+    <p id="page-sub">입수위치를 바꿔 총 시간이 최소가 되는 지점을 찾아보자.</p>
+  </header>
+
+  <!-- ===== MAIN LAYOUT ===== -->
+  <main class="layout">
+
+    <!-- ===== SCENE ===== -->
+    <section class="scene-wrap">
+      <canvas id="scene" class="scene-canvas"></canvas>
+      <p id="light-note" class="light-note" hidden>
+        실제 빛은 시간이 최소가 되는 경로(굴절 광선)를 택한다.
+      </p>
+    </section>
+
+    <!-- ===== CONTROL PANEL ===== -->
+    <aside class="panel">
+
+      <!-- 모드 토글 -->
+      <div class="mode-row">
+        <button id="btn-advanced" class="mode-btn" type="button">심화 기능</button>
+        <button id="btn-mode" class="mode-btn" type="button">비유 종료</button>
+      </div>
+
+      <!-- 입수위치 (유일한 패널 변수) -->
+      <div class="group">
+        <label class="lbl" for="x-slider">
+          <span id="x-label">입수위치</span>
+          <span class="val mono"><span id="x-readout">0</span></span>
+        </label>
+        <input id="x-slider" class="slider" type="range" min="0" max="100" step="0.5" value="40" />
+        <div class="readout">
+          <span>총 시간</span>
+          <span class="val mono"><span id="t-readout">0</span> s</span>
+        </div>
+      </div>
+
+      <!-- 심화: 굴절 조건 readout -->
+      <div id="adv-box" class="group adv" hidden>
+        <p class="formula mono" id="formula"></p>
+        <div class="readout">
+          <span id="lhs-label">sin θ₁</span>
+          <span class="val mono" id="lhs-val">0</span>
+        </div>
+        <div class="readout">
+          <span id="rhs-label">n·sin θ₂</span>
+          <span class="val mono" id="rhs-val">0</span>
+        </div>
+        <p class="hint" id="match-hint">두 값이 같아지는 입수위치가 최소시간(굴절) 지점.</p>
+      </div>
+
+      <!-- 그래프 -->
+      <div class="group">
+        <div class="group-title">시간 – 입수위치 그래프</div>
+        <canvas id="graph" class="graph-canvas"></canvas>
+        <div class="btn-row">
+          <button id="btn-record" class="btn" type="button">기록</button>
+          <button id="btn-clear" class="btn btn-ghost" type="button">전부 삭제</button>
+        </div>
+        <label class="check">
+          <input id="chk-prev" type="checkbox" checked />
+          이전 데이터 보이기
+        </label>
+      </div>
+
+      <!-- 세부설정 (접이식) -->
+      <details class="group settings">
+        <summary class="group-title">세부설정</summary>
+
+        <div class="field">
+          <label for="set-beach">해변 가로 범위</label>
+          <input id="set-beach" type="number" min="10" step="5" value="100" />
+        </div>
+        <div class="field">
+          <label for="set-L">L (구조원 → 해안선 거리)</label>
+          <input id="set-L" type="number" min="1" step="1" value="30" />
+        </div>
+        <div class="field">
+          <label for="set-d">해안선 → 사람 수직 거리</label>
+          <input id="set-d" type="number" min="1" step="1" value="40" />
+        </div>
+        <div class="field">
+          <label for="set-p">p (사람의 가로 위치)</label>
+          <input id="set-p" type="number" min="0" step="1" value="80" />
+        </div>
+        <div class="field">
+          <label for="set-v">v (모래 속력)</label>
+          <input id="set-v" type="number" min="0.1" step="0.1" value="8" />
+        </div>
+        <div class="field">
+          <label for="set-vw">물에서의 속력 (= v/n)</label>
+          <input id="set-vw" type="number" min="0.1" step="0.1" value="5" />
+        </div>
+        <p class="hint" id="set-note">물 속력은 모래 속력보다 작아야 한다 (n &gt; 1).</p>
+        <div class="readout">
+          <span>n (굴절률)</span>
+          <span class="val mono" id="n-readout">1.60</span>
+        </div>
+      </details>
+
+    </aside>
+  </main>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="foot">v1.0.0 · 2026-06-23</footer>
+
+  <!-- ===== SCRIPTS ===== -->
+  <script src="physics.js"></script>
+  <script src="scene.js"></script>
+  <script src="graph.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>
